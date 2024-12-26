@@ -2,11 +2,11 @@ from lcd1602 import LCD
 from machine import Pin
 import machine
 import utime as time
+import random
 
 
 
 def tone(pin,frequency,duration):
-    print("tone", pin,frequency,duration)
     pin.freq(frequency)
     pin.duty_u16(30000)
     time.sleep_ms(duration)
@@ -86,44 +86,27 @@ def you_lose(message):
     song(one_melody)
 
 def add_pins(colors, pins, index):
-    for j in range(len(pins)):
-        print(f"pin {j} {colors[j]} is {connected_str(pins[j])}")
-
     while True:
         if connected(pins[index]):  # Pin at the given index
-            print("good")
-            for j in range(len(pins)):
-                print(f"pin {j} {colors[j]} is {connected_str(pins[j])}")
             break
         if any(connected(pin) for pin in pins[index:]):  # Pins before the given index
-            print("bad")
-            for j in range(len(pins)):
-                print(f"pin {j} {colors[j]} is {connected_str(pins[j])}")
             return False
         time.sleep(0.1)
     return True
 
 def monitor_removal(colors_mission, pins_mission, i):
-    for j in range(len(pins_mission)):
-        print(f"pin {j} {colors_mission[j]} is {pins_mission[j].value()}")
     while True:
         lcd.write(0, 0, f"tick {i}")
         for j in range(len(pins_mission)):
             pin_j = pins_mission[j]
             if j < i:
                 if connected(pin_j):
-                    for j in range(len(pins_mission)):
-                        print(f"pin {j} {colors_mission[j]} is {pins_mission[j].value()}")
                     return False
             elif j > i:
                 if disconnected(pin_j):
-                    for j in range(len(pins_mission)):
-                        print(f"pin {j} {colors_mission[j]} is {pins_mission[j].value()}")
                     return False
             else:
                 if disconnected(pin_j):
-                    for j in range(len(pins_mission)):
-                        print(f"pin {j} {colors_mission[j]} is {pins_mission[j].value()}")
                     return True
         time.sleep(0.1)
 
@@ -136,15 +119,21 @@ def disconnected(pin):
 def connected_str(pin):
     return "connected" if connected(pin) else "disconnected"
 
-def main():
+def permutation(n):
+    lst = []
+    for i in range(n):
+        j = random.randint(0, i)
+        lst.append(None)
+        for k in range(i, j, -1):
+            lst[k] = lst[k - 1]
+        lst[j] = i
+    return lst
 
+def game():
     pins_numbers = [19, 18, 17, 16]
     colors = ["blue", "red", "green", "yellow"]
     pins = [Pin(pin_number, Pin.IN, Pin.PULL_UP) for pin_number in pins_numbers]
     holes = [50-i for i in range(len(pins))]
-    mission = [2, 3, 0, 1]
-    colors_mission = [colors[i] for i in mission]
-    pins_mission = [pins[i] for i in mission]
 
     lcd.clear()
     lcd.write(0,0,"remove any wires")
@@ -169,6 +158,11 @@ def main():
         return
 
 
+    # random permutation of the pins
+    random.seed(time.ticks_us())
+    mission = permutation(len(pins))
+    colors_mission = [colors[i] for i in mission]
+    pins_mission = [pins[i] for i in mission]
 
     lcd.clear()
     lcd.write(0, 0, "Your mission...")
@@ -181,14 +175,21 @@ def main():
     lcd.write(0, 0, "Begin:")
 
     for i in range(len(pins_mission)):
-        print(f"monitoring {colors_mission[i]}")
         if not monitor_removal(colors_mission, pins_mission, i):
             you_lose("Wrong wire")
             return
  
 
     lcd.clear()
-    lcd.write(0,0,"End of program")
+    lcd.write(0,0,"Safe!")
+    time.sleep(2)
+    return
 
+def main():
+    while True:
+        game()
+        lcd.clear()
+        lcd.write(0, 0, "Resetting...")
+        time.sleep(2)
 
 main()
