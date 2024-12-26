@@ -78,9 +78,10 @@ def song(melody):
         tone(buzzer, frequency, duration_beats)
         time.sleep_ms(int(beat_duration_ms * 0.1))  # Short pause between notes
 
-def you_lose():
+def you_lose(message):
     lcd.clear()
     lcd.write(0, 0, "You lose!")
+    lcd.write(0, 1, message)
     song(one_melody)
 
 def add_pins(pin_objects, index):
@@ -88,8 +89,21 @@ def add_pins(pin_objects, index):
         if pin_objects[index].value() == 0:  # Pin at the given index
             break
         if any(pin.value() == 0 for pin in pin_objects[:index]):  # Pins before the given index
-            you_lose()
-            return
+            return False
+        time.sleep(0.1)
+    return True
+
+def monitor_removal(colors, pin_objects, expected_index):
+    lcd.clear()
+    while True:
+        lcd.write(0, 0, f"monitor {colors[expected_index]}")
+        lcd.write(0, 1, str(pin_objects[expected_index].value()))
+        # Check if the expected pin is removed
+        if pin_objects[expected_index].value() == 1:
+            return True
+        # # Check if any subsequent pin is removed prematurely
+        # if any(pin.value() == 1 for pin in pin_objects[expected_index + 1:]):
+        #     return False
         time.sleep(0.1)
 
 def main():
@@ -108,25 +122,43 @@ def main():
     while any(pin.value() == 0 for pin in pin_objects):
         time.sleep(0.1)
 
-    lcd.clear()
-    lcd.write(0,0,"Add blue")
-    lcd.write(0,1,"from 47 to gnd")
-    add_pins(pin_objects, 3)
+    MAX_HOLE = 50
+    colors = ["blue", "red", "green", "yellow"]
+
+    pin_indices = list(range(len(colors) - 1, -1, -1))
+    for color, index in zip(colors, pin_indices):
+        lcd.clear()
+        lcd.write(0, 0, f"Add {color}")
+        lcd.write(0, 1, f"from {MAX_HOLE - index} to gnd")
+        if not add_pins(pin_objects, index):
+            you_lose("Pin too early")
+            return
+
+    # Confirm that the user has connected all wires
+    # if not, the user loses the game
+    if any(pin.value() == 1 for pin in pin_objects):
+        you_lose("Wires missing")
+        return
+
+    mission = [2, 3, 0, 1]
 
     lcd.clear()
-    lcd.write(0,0,"Add red")
-    lcd.write(0,1,"from 48 to gnd")
-    add_pins(pin_objects, 2)
-
+    lcd.write(0, 0, "Your mission:")
+    time.sleep(5)
+    for i in mission:
+        lcd.clear()
+        lcd.write(0, 0, f"+/- {colors[i]}")
+        time.sleep(1)
     lcd.clear()
-    lcd.write(0,0,"Add green")
-    lcd.write(0,1,"from 49 to gnd")
-    add_pins(pin_objects, 1)
+    lcd.write(0, 0, "Begin:")
 
-    lcd.clear()
-    lcd.write(0,0,"Add yellow")
-    lcd.write(0,1,"from 50 to gnd")
-    add_pins(pin_objects, 0)
+    for count, expected_index in enumerate(mission):
+        lcd.clear()
+        lcd.write(0, 0, str(count))
+        lcd.write(0, 1, colors[expected_index])
+        if not monitor_removal(colors, pin_objects, expected_index):
+            you_lose("Wrong wire")
+            return
 
 
     lcd.clear()
