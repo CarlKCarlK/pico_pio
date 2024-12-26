@@ -82,95 +82,113 @@ def you_lose(message):
     lcd.clear()
     lcd.write(0, 0, "You lose!")
     lcd.write(0, 1, message)
+    # song(jingle_bells_melody) 
     song(one_melody)
 
-def add_pins(pin_objects, index):
+def add_pins(colors, pins, index):
+    for j in range(len(pins)):
+        print(f"pin {j} {colors[j]} is {connected_str(pins[j])}")
+
     while True:
-        if pin_objects[index].value() == 0:  # Pin at the given index
+        if connected(pins[index]):  # Pin at the given index
+            print("good")
+            for j in range(len(pins)):
+                print(f"pin {j} {colors[j]} is {connected_str(pins[j])}")
             break
-        if any(pin.value() == 0 for pin in pin_objects[:index]):  # Pins before the given index
+        if any(connected(pin) for pin in pins[index:]):  # Pins before the given index
+            print("bad")
+            for j in range(len(pins)):
+                print(f"pin {j} {colors[j]} is {connected_str(pins[j])}")
             return False
         time.sleep(0.1)
     return True
 
-def monitor_removal(colors, pin_objects, expected_index):
-    lcd.clear()
+def monitor_removal(colors_mission, pins_mission, i):
+    for j in range(len(pins_mission)):
+        print(f"pin {j} {colors_mission[j]} is {pins_mission[j].value()}")
     while True:
-        lcd.write(0, 0, f"monitor {colors[expected_index]}")
-        lcd.write(0, 1, str(pin_objects[expected_index].value()))
-        # Check if the expected pin is removed
-        if pin_objects[expected_index].value() == 1:
-            return True
-        # # Check if any subsequent pin is removed prematurely
-        # if any(pin.value() == 1 for pin in pin_objects[expected_index + 1:]):
-        #     return False
+        lcd.write(0, 0, f"tick {i}")
+        for j in range(len(pins_mission)):
+            pin_j = pins_mission[j]
+            if j < i:
+                if connected(pin_j):
+                    for j in range(len(pins_mission)):
+                        print(f"pin {j} {colors_mission[j]} is {pins_mission[j].value()}")
+                    return False
+            elif j > i:
+                if disconnected(pin_j):
+                    for j in range(len(pins_mission)):
+                        print(f"pin {j} {colors_mission[j]} is {pins_mission[j].value()}")
+                    return False
+            else:
+                if disconnected(pin_j):
+                    for j in range(len(pins_mission)):
+                        print(f"pin {j} {colors_mission[j]} is {pins_mission[j].value()}")
+                    return True
         time.sleep(0.1)
+
+def connected(pin):
+    return pin.value() == 0
+
+def disconnected(pin):
+    return pin.value() == 1
+
+def connected_str(pin):
+    return "connected" if connected(pin) else "disconnected"
 
 def main():
 
-    # Define the GPIO pins to monitor
-    pins_to_monitor = [16, 17, 18, 19]
-
-    # Initialize each pin as an input with an internal pull-up resistor
-    pin_objects = [Pin(pin_num, Pin.IN, Pin.PULL_UP) for pin_num in pins_to_monitor]
+    pins_numbers = [19, 18, 17, 16]
+    colors = ["blue", "red", "green", "yellow"]
+    pins = [Pin(pin_number, Pin.IN, Pin.PULL_UP) for pin_number in pins_numbers]
+    holes = [50-i for i in range(len(pins))]
+    mission = [2, 3, 0, 1]
+    colors_mission = [colors[i] for i in mission]
+    pins_mission = [pins[i] for i in mission]
 
     lcd.clear()
     lcd.write(0,0,"remove any wires")
-    lcd.write(0,1,"47 to 50 to gnd")
+    lcd.write(0,1,f"{min(holes)} to {max(holes)} to gnd")
 
     # Wait until all wires are removed
-    while any(pin.value() == 0 for pin in pin_objects):
+    while any(connected(pin) for pin in pins):
         time.sleep(0.1)
 
-    MAX_HOLE = 50
-    colors = ["blue", "red", "green", "yellow"]
-
-    pin_indices = list(range(len(colors) - 1, -1, -1))
-    for color, index in zip(colors, pin_indices):
+    for index in range(len(pins)):
         lcd.clear()
-        lcd.write(0, 0, f"Add {color}")
-        lcd.write(0, 1, f"from {MAX_HOLE - index} to gnd")
-        if not add_pins(pin_objects, index):
+        lcd.write(0, 0, f"Add {colors[index]}")
+        lcd.write(0, 1, f"from {holes[index]} to gnd")
+        if not add_pins(colors, pins, index):
             you_lose("Pin too early")
             return
 
     # Confirm that the user has connected all wires
     # if not, the user loses the game
-    if any(pin.value() == 1 for pin in pin_objects):
+    if any(disconnected(pin) for pin in pins):
         you_lose("Wires missing")
         return
 
-    mission = [2, 3, 0, 1]
+
 
     lcd.clear()
-    lcd.write(0, 0, "Your mission:")
+    lcd.write(0, 0, "Your mission...")
     time.sleep(5)
-    for i in mission:
+    for color in colors_mission:
         lcd.clear()
-        lcd.write(0, 0, f"+/- {colors[i]}")
+        lcd.write(0, 0, f"+/- {color}")
         time.sleep(1)
     lcd.clear()
     lcd.write(0, 0, "Begin:")
 
-    for count, expected_index in enumerate(mission):
-        lcd.clear()
-        lcd.write(0, 0, str(count))
-        lcd.write(0, 1, colors[expected_index])
-        if not monitor_removal(colors, pin_objects, expected_index):
+    for i in range(len(pins_mission)):
+        print(f"monitoring {colors_mission[i]}")
+        if not monitor_removal(colors_mission, pins_mission, i):
             you_lose("Wrong wire")
             return
-
+ 
 
     lcd.clear()
     lcd.write(0,0,"End of program")
 
-
-    # while True:
-    #     for pin in pin_objects:
-    #         if pin.value() == 0:
-    #             print(f"GPIO {pin} is connected (LOW).")
-    #         else:
-    #             print(f"GPIO {pin} is disconnected (HIGH).")
-    #     time.sleep(1)  # Delay to prevent excessive printing
 
 main()
