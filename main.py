@@ -78,14 +78,21 @@ def song(melody):
         tone(buzzer, frequency, duration_beats)
         time.sleep_ms(int(beat_duration_ms * 0.1))  # Short pause between notes
 
-def main():
-    myName= "Santa" # input('What is Your Name? ')
+def you_lose():
     lcd.clear()
-    greeting1='Hello '+myName
-    greeting2='Welcome to My Pi'
-    lcd.write(0,0,greeting1)
-    lcd.write(0,1,greeting2)
+    lcd.write(0, 0, "You lose!")
     song(one_melody)
+
+def add_pins(pin_objects, index):
+    while True:
+        if pin_objects[index].value() == 0:  # Pin at the given index
+            break
+        if any(pin.value() == 0 for pin in pin_objects[:index]):  # Pins before the given index
+            you_lose()
+            return
+        time.sleep(0.1)
+
+def main():
 
     # Define the GPIO pins to monitor
     pins_to_monitor = [16, 17, 18, 19]
@@ -93,12 +100,45 @@ def main():
     # Initialize each pin as an input with an internal pull-up resistor
     pin_objects = [Pin(pin_num, Pin.IN, Pin.PULL_UP) for pin_num in pins_to_monitor]
 
-    while True:
-        for pin in pin_objects:
-            if pin.value() == 0:
-                print(f"GPIO {pin} is connected (LOW).")
-            else:
-                print(f"GPIO {pin} is disconnected (HIGH).")
-        time.sleep(1)  # Delay to prevent excessive printing
+    lcd.clear()
+    lcd.write(0,0,"remove any wires")
+    lcd.write(0,1,"47 to 50 to gnd")
+
+    # Wait until all wires are removed
+    while any(pin.value() == 0 for pin in pin_objects):
+        time.sleep(0.1)
+
+    lcd.clear()
+    lcd.write(0,0,"Add blue")
+    lcd.write(0,1,"from 47 to gnd")
+    add_pins(pin_objects, 3)
+
+    lcd.clear()
+    lcd.write(0,0,"Add red")
+    lcd.write(0,1,"from 48 to gnd")
+    add_pins(pin_objects, 2)
+
+    lcd.clear()
+    lcd.write(0,0,"Add green")
+    lcd.write(0,1,"from 49 to gnd")
+    add_pins(pin_objects, 1)
+
+    lcd.clear()
+    lcd.write(0,0,"Add yellow")
+    lcd.write(0,1,"from 50 to gnd")
+    add_pins(pin_objects, 0)
+
+
+    lcd.clear()
+    lcd.write(0,0,"End of program")
+
+
+    # while True:
+    #     for pin in pin_objects:
+    #         if pin.value() == 0:
+    #             print(f"GPIO {pin} is connected (LOW).")
+    #         else:
+    #             print(f"GPIO {pin} is disconnected (HIGH).")
+    #     time.sleep(1)  # Delay to prevent excessive printing
 
 main()
