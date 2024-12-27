@@ -1,16 +1,20 @@
 from lcd1602 import LCD
 from machine import Pin
 import machine
-import utime as time
+# import utime as utime
+import utime
 import random
 
 
 
-def tone(pin,frequency,duration):
-    pin.freq(frequency)
-    pin.duty_u16(30000)
-    time.sleep_ms(duration)
-    pin.duty_u16(0)
+def tone(pin, frequency, duration):
+    if frequency > 0:
+        pin.freq(frequency)
+        pin.duty_u16(30000)
+        utime.sleep_ms(duration)
+        pin.duty_u16(0)  # Ensure PWM stops
+    else:
+        utime.sleep_ms(duration)  # Silence duration
 
 lcd=LCD()
 buzzer = machine.PWM(machine.Pin(15))
@@ -55,18 +59,14 @@ one_melody = [
     ('B3', 1)
  ]
 
-# Tempo settings
-BPM = 200  # Beats per minute; adjust this value to control the tempo
-beat_duration_ms = 60000 / BPM  # Duration of a single beat in milliseconds
 
-def tone(pin, frequency, duration_beats):
-    duration_ms = duration_beats * beat_duration_ms
+def tone(pin, frequency, duration_ms):
     if frequency == 0:  # Pause
-        time.sleep_ms(int(duration_ms))
+        utime.sleep_ms(int(duration_ms))
     else:
         pin.freq(frequency)
         pin.duty_u16(30_000)
-        time.sleep_ms(int(duration_ms))
+        utime.sleep_ms(int(duration_ms))
         pin.duty_u16(0)
 
 
@@ -76,7 +76,7 @@ def song(melody):
     for note, duration_beats in melody:
         frequency = NOTE_FREQUENCIES[note]
         tone(buzzer, frequency, duration_beats)
-        time.sleep_ms(int(beat_duration_ms * 0.1))  # Short pause between notes
+        utime.sleep_ms(int(beat_duration_ms * 0.1))  # Short pause between notes
 
 def you_lose(message):
     lcd.clear()
@@ -91,7 +91,7 @@ def add_pins(colors, pins, index):
             break
         if any(connected(pin) for pin in pins[index:]):  # Pins before the given index
             return False
-        time.sleep(0.1)
+        utime.sleep(0.1)
     return True
 
 def monitor_removal(colors_mission, pins_mission, i):
@@ -108,7 +108,7 @@ def monitor_removal(colors_mission, pins_mission, i):
             else:
                 if disconnected(pin_j):
                     return True
-        time.sleep(0.1)
+        utime.sleep(0.1)
 
 def connected(pin):
     return pin.value() == 0
@@ -141,7 +141,7 @@ def game():
 
     # Wait until all wires are removed
     while any(connected(pin) for pin in pins):
-        time.sleep(0.1)
+        utime.sleep(0.1)
 
     for index in range(len(pins)):
         lcd.clear()
@@ -159,18 +159,18 @@ def game():
 
 
     # random permutation of the pins
-    random.seed(time.ticks_us())
+    random.seed(utime.ticks_us())
     mission = permutation(len(pins))
     colors_mission = [colors[i] for i in mission]
     pins_mission = [pins[i] for i in mission]
 
     lcd.clear()
     lcd.write(0, 0, "Your mission...")
-    time.sleep(5)
+    utime.sleep(5)
     for color in colors_mission:
         lcd.clear()
         lcd.write(0, 0, f"+/- {color}")
-        time.sleep(1)
+        utime.sleep(1)
     lcd.clear()
     lcd.write(0, 0, "Begin:")
 
@@ -182,14 +182,62 @@ def game():
 
     lcd.clear()
     lcd.write(0,0,"Safe!")
-    time.sleep(2)
+    utime.sleep(2)
     return
 
-def main():
+def wired_main():
     while True:
         game()
         lcd.clear()
         lcd.write(0, 0, "Resetting...")
-        time.sleep(2)
+        utime.sleep(2)
 
-main()
+def thman_main():
+    TRIG = machine.Pin(17, machine.Pin.OUT)
+    ECHO = machine.Pin(16, machine.Pin.IN)
+
+    def distance():
+        TRIG.low()
+        utime.sleep_us(2)
+        TRIG.high()
+        utime.sleep_us(10)
+        TRIG.low()
+
+        # Timeout for the echo start
+        start_time = utime.ticks_us()
+        while not ECHO.value():
+            if utime.ticks_diff(utime.ticks_us(), start_time) > 100000:  # 100 ms timeout
+                return 200  # Return "far distance" if timeout occurs
+
+        time1 = utime.ticks_us()
+
+        # Timeout for the echo end
+        while ECHO.value():
+            if utime.ticks_diff(utime.ticks_us(), time1) > 100000:  # 100 ms timeout
+                return 200  # Return "far distance" if timeout occurs
+
+        time2 = utime.ticks_us()
+        during = utime.ticks_diff(time2, time1)
+        return during * 340 / 2 / 10000
+
+    def map_distance_to_frequency(distance_cm):
+        if distance_cm > 100:
+            return 0  # Silence for distances > 100
+        elif distance_cm < 3:
+            return 200  # Minimum frequency for very short distances
+        else:
+            # Map 3-60 cm to 200-1000 Hz range
+            return int(200 + ((distance_cm - 3) * (800 / (60 - 3))))
+
+
+    tone(buzzer, 300, 1)
+    while True:
+        dis = distance()
+        print('Distance: %.2f cm' % dis)  # Debugging output
+        frequency = map_distance_to_frequency(dis)
+        if frequency > 0:
+            tone(buzzer, frequency, 200)  # Play tone for 300 ms
+        else:
+            utime.sleep_ms(300)  # Silence for 300 ms
+
+thman_main()
