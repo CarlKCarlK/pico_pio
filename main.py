@@ -4,17 +4,20 @@ import machine
 # import utime as utime
 import utime
 import random
+import _thread
+import math
 
+shared_distance = [200]  # Shared distance value between cores
 
-
-def tone(pin, frequency, duration):
-    if frequency > 0:
-        pin.freq(frequency)
-        pin.duty_u16(30000)
-        utime.sleep_ms(duration)
-        pin.duty_u16(0)  # Ensure PWM stops
-    else:
-        utime.sleep_ms(duration)  # Silence duration
+# def tone(pin, frequency, duration):
+#     print(f"tone {frequency} {duration}")
+#     if frequency > 0:
+#         pin.freq(frequency)
+#         pin.duty_u16(30000)
+#         utime.sleep_ms(duration)s
+#         pin.duty_u16(0)  # Ensure PWM stops
+#     else:
+#         utime.sleep_ms(duration)  # Silence duration
 
 lcd=LCD()
 buzzer = machine.PWM(machine.Pin(15))
@@ -60,14 +63,15 @@ one_melody = [
  ]
 
 
-def tone(pin, frequency, duration_ms):
-    if frequency == 0:  # Pause
-        utime.sleep_ms(int(duration_ms))
-    else:
-        pin.freq(frequency)
-        pin.duty_u16(30_000)
-        utime.sleep_ms(int(duration_ms))
-        pin.duty_u16(0)
+# def tone(pin, frequency, duration_ms):
+#     print(f"tone {frequency} {duration_ms}")
+#     if frequency == 0:  # Pause
+#         utime.sleep_ms(int(duration_ms))
+#     else:
+#         pin.freq(frequency)
+#         pin.duty_u16(30_000)
+#         utime.sleep_ms(int(duration_ms))
+#         pin.duty_u16(0)
 
 
 def song(melody):
@@ -129,74 +133,26 @@ def permutation(n):
         lst[j] = i
     return lst
 
-def game():
-    pins_numbers = [19, 18, 17, 16]
-    colors = ["blue", "red", "green", "yellow"]
-    pins = [Pin(pin_number, Pin.IN, Pin.PULL_UP) for pin_number in pins_numbers]
-    holes = [50-i for i in range(len(pins))]
-
-    lcd.clear()
-    lcd.write(0,0,"remove any wires")
-    lcd.write(0,1,f"{min(holes)} to {max(holes)} to gnd")
-
-    # Wait until all wires are removed
-    while any(connected(pin) for pin in pins):
-        utime.sleep(0.1)
-
-    for index in range(len(pins)):
-        lcd.clear()
-        lcd.write(0, 0, f"Add {colors[index]}")
-        lcd.write(0, 1, f"from {holes[index]} to gnd")
-        if not add_pins(colors, pins, index):
-            you_lose("Pin too early")
-            return
-
-    # Confirm that the user has connected all wires
-    # if not, the user loses the game
-    if any(disconnected(pin) for pin in pins):
-        you_lose("Wires missing")
-        return
 
 
-    # random permutation of the pins
-    random.seed(utime.ticks_us())
-    mission = permutation(len(pins))
-    colors_mission = [colors[i] for i in mission]
-    pins_mission = [pins[i] for i in mission]
+# Map distance to frequency
+def map_distance_to_frequency(distance_cm):
+    if distance_cm > 100.0:
+        return 0  # Silence for distances > 100
+    else:
+        # Map 3-60 cm to 200-1000 Hz range
+        return int(200.0 + ((distance_cm - 3.0) * (800.0 / (60.0 - 3.0))))
 
-    lcd.clear()
-    lcd.write(0, 0, "Your mission...")
-    utime.sleep(5)
-    for color in colors_mission:
-        lcd.clear()
-        lcd.write(0, 0, f"+/- {color}")
-        utime.sleep(1)
-    lcd.clear()
-    lcd.write(0, 0, "Begin:")
+# Measure distance (runs on Core 1)
 
-    for i in range(len(pins_mission)):
-        if not monitor_removal(colors_mission, pins_mission, i):
-            you_lose("Wrong wire")
-            return
- 
 
-    lcd.clear()
-    lcd.write(0,0,"Safe!")
-    utime.sleep(2)
-    return
+def measure_distance():
+    global shared_distance
 
-def wired_main():
-    while True:
-        game()
-        lcd.clear()
-        lcd.write(0, 0, "Resetting...")
-        utime.sleep(2)
-
-def thman_main():
     TRIG = machine.Pin(17, machine.Pin.OUT)
     ECHO = machine.Pin(16, machine.Pin.IN)
 
-    def distance():
+    while True:
         TRIG.low()
         utime.sleep_us(2)
         TRIG.high()
@@ -207,37 +163,71 @@ def thman_main():
         start_time = utime.ticks_us()
         while not ECHO.value():
             if utime.ticks_diff(utime.ticks_us(), start_time) > 100000:  # 100 ms timeout
-                return 200  # Return "far distance" if timeout occurs
+                shared_distance[0] = 200
+                break
 
         time1 = utime.ticks_us()
-
-        # Timeout for the echo end
         while ECHO.value():
             if utime.ticks_diff(utime.ticks_us(), time1) > 100000:  # 100 ms timeout
-                return 200  # Return "far distance" if timeout occurs
+                shared_distance[0] = 200
+                break
 
         time2 = utime.ticks_us()
-        during = utime.ticks_diff(time2, time1)
-        return during * 340 / 2 / 10000
-
-    def map_distance_to_frequency(distance_cm):
-        if distance_cm > 100:
-            return 0  # Silence for distances > 100
-        elif distance_cm < 3:
-            return 200  # Minimum frequency for very short distances
-        else:
-            # Map 3-60 cm to 200-1000 Hz range
-            return int(200 + ((distance_cm - 3) * (800 / (60 - 3))))
+        duration = utime.ticks_diff(time2, time1)
+        distance_cm = float(duration) * 340.0 / 2.0 / 10000.0
 
 
-    tone(buzzer, 300, 1)
+        # Update the shared distance with the smoothed value
+        shared_distance[0] = distance_cm
+
+def snap_to_western_scale(freq):
+    if freq <= 0:
+        return 0  # Invalid frequency
+    
+    # Calculate semitones from A4 (440 Hz)
+    n = 12 * math.log2(freq / 440.0)
+    n_rounded = round(n)  # Round to the nearest semitone
+
+    # Calculate the closest Western note frequency
+    closest_freq = 440.0 * (2 ** (n_rounded / 12))
+
+    return int(closest_freq)
+
+# Semitone offsets for black keys relative to an octave
+BLACK_KEY_SEMITONES = [1, 3, 6, 8, 10]
+
+def snap_to_black_keys(freq):
+    if freq <= 0:
+        return 0  # Invalid frequency
+    
+    # Calculate semitones from A4 (440 Hz)
+    n = 12 * math.log2(freq / 440.0)
+    base_octave = int(n // 12) * 12  # Find the base octave for n
+    fractional_semitone = n % 12
+
+    # Find the closest black key semitone in the current octave
+    closest_semitone = min(BLACK_KEY_SEMITONES, key=lambda x: abs(x - fractional_semitone))
+    snapped_semitone = base_octave + closest_semitone
+
+    # Convert back to frequency
+    snapped_freq = 440.0 * (2 ** (snapped_semitone / 12))
+    return round(snapped_freq)
+
+def play_tones():
     while True:
-        dis = distance()
-        print('Distance: %.2f cm' % dis)  # Debugging output
-        frequency = map_distance_to_frequency(dis)
-        if frequency > 0:
-            tone(buzzer, frequency, 200)  # Play tone for 300 ms
+        distance = shared_distance[0]
+        frequency = map_distance_to_frequency(distance)
+        frequency = snap_to_black_keys(frequency)
+        print(f"distance: {distance}, snap to black frequency: {frequency}")
+        if frequency > 50:  # Ignore frequencies too low to be valid
+            buzzer.freq(frequency)
+            buzzer.duty_u16(30000)
+            utime.sleep_ms(200)
+            buzzer.duty_u16(0)
         else:
-            utime.sleep_ms(300)  # Silence for 300 ms
+            utime.sleep_ms(200)  # Pause when out of ran
 
-thman_main()
+
+# Start distance measurement on Core 1
+_thread.start_new_thread(measure_distance, ())
+play_tones()
