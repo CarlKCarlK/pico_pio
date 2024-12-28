@@ -92,40 +92,32 @@ def map_distance_to_frequency(distance_cm):
 
 # Measure distance (runs on Core 1)
 
+TRIG = machine.Pin(17, machine.Pin.OUT)
+ECHO = machine.Pin(16, machine.Pin.IN)
+
 
 def measure_distance():
-    global shared_distance
+    TRIG.low()
+    utime.sleep_us(2)
+    TRIG.high()
+    utime.sleep_us(10)
+    TRIG.low()
 
-    TRIG = machine.Pin(17, machine.Pin.OUT)
-    ECHO = machine.Pin(16, machine.Pin.IN)
+    # Timeout for the echo start
+    start_time = utime.ticks_us()
+    while not ECHO.value():
+        if utime.ticks_diff(utime.ticks_us(), start_time) > 100_000:  # 100 ms timeout
+            return 200
 
-    while True:
-        TRIG.low()
-        utime.sleep_us(2)
-        TRIG.high()
-        utime.sleep_us(10)
-        TRIG.low()
+    time1 = utime.ticks_us()
+    while ECHO.value():
+        if utime.ticks_diff(utime.ticks_us(), time1) > 100_000:  # 100 ms timeout
+            return 200
 
-        # Timeout for the echo start
-        start_time = utime.ticks_us()
-        while not ECHO.value():
-            if utime.ticks_diff(utime.ticks_us(), start_time) > 100000:  # 100 ms timeout
-                shared_distance[0] = 200
-                break
-
-        time1 = utime.ticks_us()
-        while ECHO.value():
-            if utime.ticks_diff(utime.ticks_us(), time1) > 100000:  # 100 ms timeout
-                shared_distance[0] = 200
-                break
-
-        time2 = utime.ticks_us()
-        duration = utime.ticks_diff(time2, time1)
-        distance_cm = float(duration) * 340.0 / 2.0 / 10000.0
-
-
-        # Update the shared distance with the smoothed value
-        shared_distance[0] = distance_cm
+    time2 = utime.ticks_us()
+    duration = utime.ticks_diff(time2, time1)
+    distance_cm = float(duration) * 340.0 / 2.0 / 10000.0
+    return distance_cm
 
 def snap_to_western_scale(freq):
     if freq <= 0:
@@ -177,25 +169,55 @@ amazing_grace_frequencies = [
     92.50          # F#2 ("me.")
 ]
 
+c_major_scale = [
+    ("C5", 523.25),  # High C
+    ("B4", 493.88),  # B
+    ("A4", 440.00),  # A
+    ("G4", 392.00),  # G
+    ("F4", 349.23),  # F
+    ("E4", 329.63),  # E
+    ("D4", 293.66),  # D
+    ("C4", 261.63)   # Low C
+]
+
+jjb_scale = [
+   ("G4", 392.00),  # G
+   ("F4", 349.23),  # F
+   ("E4", 329.63),  # E
+   ("D4", 293.66),  # D
+   ("C4", 261.63)   # Low C
+]
 
 def play_tones():
-    index = 0
     while True:
-        distance = shared_distance[0]
-        frequency = map_distance_to_frequency(distance)
-        frequency = snap_to_black_keys(frequency)
-        if frequency > 156:  # Ignore frequencies too low to be valid
-            # frequency = int(amazing_grace_frequencies[index])
-            print(f"distance: {distance}, snap to ag2 frequency: {frequency}")
-            # index = (index + 1) % len(amazing_grace_frequencies)
-            buzzer.freq(frequency)
-            buzzer.duty_u16(30000)
-            utime.sleep_ms(200)
-            buzzer.duty_u16(0)
-        else:
-            utime.sleep_ms(200)  # Pause when out of ran
+        distance = measure_distance()
+        fraction = 1-(distance - 10.0)/70.0
+        if fraction < 0.0 or fraction > 1.0:
+            continue
+        index = int(fraction * len(jjb_scale))
+        (note, frequency) = jjb_scale[index]
+        print(f"{note}, frequency: {frequency}, distance: {distance}")
+        buzzer.freq(int(frequency/2.0))
+        buzzer.duty_u16(30000)
+        utime.sleep_ms(400)
+        buzzer.duty_u16(0)
+
+        # convert distance
+        utime.sleep_ms(200)
+        # frequency = map_distance_to_frequency(distance)
+        # frequency = snap_to_black_keys(frequency)
+        # if frequency > 156:  # Ignore frequencies too low to be valid
+        #     # frequency = int(amazing_grace_frequencies[index])
+        #     print(f"distance: {distance}, snap to ag2 frequency: {frequency}")
+        #     # index = (index + 1) % len(amazing_grace_frequencies)
+        #     buzzer.freq(frequency)
+        #     buzzer.duty_u16(30000)
+        #     utime.sleep_ms(200)
+        #     buzzer.duty_u16(0)
+        # else:
+        #     utime.sleep_ms(200)  # Pause when out of ran
 
 
 # Start distance measurement on Core 1
-_thread.start_new_thread(measure_distance, ())
+# _thread.start_new_thread(measure_distance, ())
 play_tones()
