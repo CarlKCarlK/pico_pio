@@ -1,9 +1,7 @@
 from lcd1602 import LCD
 from machine import Pin
-import machine
-# import utime as utime
-import utime
-import random
+import machine # type: ignore
+import utime # type: ignore
 import _thread
 import math
 
@@ -62,16 +60,17 @@ one_melody = [
     ('B3', 1)
  ]
 
+beat_duration_ms = 500  # Duration of a beat in ms
 
-# def tone(pin, frequency, duration_ms):
-#     print(f"tone {frequency} {duration_ms}")
-#     if frequency == 0:  # Pause
-#         utime.sleep_ms(int(duration_ms))
-#     else:
-#         pin.freq(frequency)
-#         pin.duty_u16(30_000)
-#         utime.sleep_ms(int(duration_ms))
-#         pin.duty_u16(0)
+def tone(pin, frequency, duration_ms):
+    print(f"tone {frequency} {duration_ms}")
+    if frequency == 0:  # Pause
+        utime.sleep_ms(int(duration_ms))
+    else:
+        pin.freq(frequency)
+        pin.duty_u16(30_000)
+        utime.sleep_ms(int(duration_ms))
+        pin.duty_u16(0)
 
 
 def song(melody):
@@ -81,58 +80,6 @@ def song(melody):
         frequency = NOTE_FREQUENCIES[note]
         tone(buzzer, frequency, duration_beats)
         utime.sleep_ms(int(beat_duration_ms * 0.1))  # Short pause between notes
-
-def you_lose(message):
-    lcd.clear()
-    lcd.write(0, 0, "You lose!")
-    lcd.write(0, 1, message)
-    # song(jingle_bells_melody) 
-    song(one_melody)
-
-def add_pins(colors, pins, index):
-    while True:
-        if connected(pins[index]):  # Pin at the given index
-            break
-        if any(connected(pin) for pin in pins[index:]):  # Pins before the given index
-            return False
-        utime.sleep(0.1)
-    return True
-
-def monitor_removal(colors_mission, pins_mission, i):
-    while True:
-        lcd.write(0, 0, f"tick {i}")
-        for j in range(len(pins_mission)):
-            pin_j = pins_mission[j]
-            if j < i:
-                if connected(pin_j):
-                    return False
-            elif j > i:
-                if disconnected(pin_j):
-                    return False
-            else:
-                if disconnected(pin_j):
-                    return True
-        utime.sleep(0.1)
-
-def connected(pin):
-    return pin.value() == 0
-
-def disconnected(pin):
-    return pin.value() == 1
-
-def connected_str(pin):
-    return "connected" if connected(pin) else "disconnected"
-
-def permutation(n):
-    lst = []
-    for i in range(n):
-        j = random.randint(0, i)
-        lst.append(None)
-        for k in range(i, j, -1):
-            lst[k] = lst[k - 1]
-        lst[j] = i
-    return lst
-
 
 
 # Map distance to frequency
@@ -211,15 +158,36 @@ def snap_to_black_keys(freq):
 
     # Convert back to frequency
     snapped_freq = 440.0 * (2 ** (snapped_semitone / 12))
-    return round(snapped_freq)
+    return round(snapped_freq/2)
+
+amazing_grace_frequencies = [
+    77.78,         # D#2 ("A-")
+    92.50,         # F#2 ("ma-")
+    92.50,         # F#2 ("zing")
+    103.83,        # G#2 ("Grace,")
+    92.50,         # F#2 ("how")
+    77.78,         # D#2 ("sweet")
+    69.30, 69.30,  # C#2 ("the") - 2 beats
+    77.78,         # D#2 ("sound")
+    92.50,         # F#2 ("That")
+    103.83,        # G#2 ("saved")
+    103.83,        # G#2 ("a")
+    116.54,        # A#2 ("wretch")
+    103.83, 103.83, # G#2 ("like") - 2 beats
+    92.50          # F#2 ("me.")
+]
+
 
 def play_tones():
+    index = 0
     while True:
         distance = shared_distance[0]
         frequency = map_distance_to_frequency(distance)
         frequency = snap_to_black_keys(frequency)
-        print(f"distance: {distance}, snap to black frequency: {frequency}")
-        if frequency > 50:  # Ignore frequencies too low to be valid
+        if frequency > 156:  # Ignore frequencies too low to be valid
+            # frequency = int(amazing_grace_frequencies[index])
+            print(f"distance: {distance}, snap to ag2 frequency: {frequency}")
+            # index = (index + 1) % len(amazing_grace_frequencies)
             buzzer.freq(frequency)
             buzzer.duty_u16(30000)
             utime.sleep_ms(200)
