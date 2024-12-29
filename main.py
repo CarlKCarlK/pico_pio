@@ -4,6 +4,7 @@ import machine # type: ignore
 import utime # type: ignore
 import _thread
 import math
+import rp2
 
 shared_distance = [200]  # Shared distance value between cores
 
@@ -239,4 +240,141 @@ def play_tones():
 
 # Start distance measurement on Core 1
 # _thread.start_new_thread(measure_distance, ())
-play_tones()
+# play_tones()
+
+def play_scale():
+    buzzer.duty_u16(30000)
+    for freq in range(500, 10, -1):
+        print(f"freq: {freq}")
+        buzzer.freq(int(freq))
+        utime.sleep_ms(10)
+    buzzer.duty_u16(0)
+
+def play_fast():
+    buzzer.duty_u16(30000)
+    while True:
+        distance = measure_distance()
+        fraction = (distance - 10.0)/70.0
+        if fraction > 1.0 or fraction < 0.0:
+            buzzer.duty_u16(0)
+            print(f"reset (distance: {distance}, fraction: {fraction})")
+            continue
+        buzzer.duty_u16(30000)
+        frequency = int(fraction * 500 + 20)
+        buzzer.freq(frequency)
+        utime.sleep_ms(20)
+
+def two_tone(pin, frequency, duration_ms):
+    if frequency < 400:
+        bit_bang_tone(pin, frequency, duration_ms)
+        return
+    buzzer = machine.PWM(machine.Pin(pin))
+    buzzer.duty_u16(30000)
+    buzzer.freq(frequency)
+    utime.sleep_ms(duration_ms)
+    
+# play_scale()
+# play_fast()
+
+def bit_bang_tone(pin, frequency, duration_ms):
+    buzzer = Pin(pin, Pin.OUT)
+    if frequency <= 0:
+        utime.sleep_ms(duration_ms)  # Silence
+        return
+
+    period = 1 / frequency  # Period of the wave (seconds)
+    half_period = period / 2  # Half the wave for HIGH and LOW (seconds)
+    end_time = utime.ticks_add(utime.ticks_ms(), duration_ms)
+
+    while utime.ticks_diff(end_time, utime.ticks_ms()) > 0:
+        buzzer.high()
+        utime.sleep(half_period)
+        buzzer.low()
+        utime.sleep(half_period)
+
+def bit_banging_sweep(start_freq, end_freq, step, duration_ms):
+    for freq in range(start_freq, end_freq - 1, -step):  # Sweep down
+        print(f"Playing {freq} Hz")
+        bit_bang_tone(buzzer, freq, duration_ms)
+
+def two_tone_sweep(start_freq, end_freq, step, duration_ms):
+    for freq in range(start_freq, end_freq - 1, -step):  # Sweep down
+        print(f"Playing {freq} Hz")
+        two_tone(15, freq, duration_ms)
+
+
+# Run a frequency sweep
+# two_tone_sweep(1000, 1, step=1, duration_ms=10)
+
+def play_two_tone():
+    while True:
+        distance = measure_distance()
+        fraction = (distance - 10.0)/70.0
+        if fraction > 1.0 or fraction < 0.0:
+            buzzer = machine.PWM(machine.Pin(15))
+            buzzer.duty_u16(0)
+            print(f"reset (distance: {distance}, fraction: {fraction})")
+            continue
+        frequency = int(fraction * 1000)
+        print(f"distance: {distance}, frequency: {frequency}")
+        two_tone(15, frequency, 20)
+
+# play_two_tone()
+# two_tone_sweep(1000, 1, step=1, duration_ms=10)
+
+
+
+
+# Define the PIO program for generating a square wave
+@rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
+def square_wave():
+    wrap_target()
+    pull(block)           # Wait until new data is available in FIFO
+    mov(x, osr)           # Move the delay value into X register
+    set(pins, 1)          # Set pin HIGH
+    label("delay_high")
+    jmp(x_dec, "delay_high")[15]  # Decrement X until it reaches 0
+    set(pins, 0)          # Set pin LOW
+    pull(block)           # Wait for next delay value
+    mov(x, osr)           # Load next delay into X register
+    label("delay_low")
+    jmp(x_dec, "delay_low")[15]  # Decrement X until it reaches 0
+    wrap()
+
+# Function to calculate delay for a given frequency
+def frequency_to_delay(frequency, pio_clock_hz=125_000_000):
+    total_cycles = pio_clock_hz // frequency
+    adjusted_cycles = (total_cycles // 2) // 16  # Subtract the extra delay from [15]
+    
+    if adjusted_cycles > 65535:
+        raise ValueError("Frequency too low for this implementation")
+    if adjusted_cycles < 1:
+        raise ValueError("Frequency too high for this implementation")
+    
+    return adjusted_cycles
+
+
+def test_fixed_frequency():
+    buzzer = Pin(15, Pin.OUT)  # GPIO 15 for buzzer
+    sm = rp2.StateMachine(0, square_wave, set_base=buzzer)
+
+    sm.active(1)  # Start the PIO state machine
+    while True:
+        distance = measure_distance()
+        fraction = (distance - 10.0)/70.0
+        if fraction > 1.0 or fraction < 0.0:
+            continue
+        frequency = int(fraction * 1000)+60
+        delay = frequency_to_delay(frequency)
+        print(f"Delay for {frequency} Hz: {delay}")
+
+
+        # Push delay values into the FIFO
+        for _ in range(frequency//20+1):
+            sm.put(delay)  # Send delay for HIGH
+            sm.put(delay)  # Send delay for LOW
+            # utime.sleep_ms(200)  # Let the tone play briefly
+
+    sm.active(0)  # Stop the PIO state machine
+
+test_fixed_frequency()
