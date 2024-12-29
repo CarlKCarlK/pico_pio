@@ -188,15 +188,34 @@ jjb_scale = [
    ("C4", 261.63)   # Low C
 ]
 
+jingle_bells_melody = [
+    ("E4", 329.63, "Jin-"), ("E4", 329.63, "gle"), ("E4", 329.63, "bells"),       # Jingle bells, jingle bells
+    ("E4", 329.63, "Jin-"), ("E4", 329.63, "gle"), ("E4", 329.63, "bells"),       # Jingle all the way
+    ("E4", 329.63, "Jin"), ("G4", 392.00, "gle"), ("C4", 261.63, "all"),          # Oh what fun it is to ride
+    ("D4", 293.66, "the"), ("E4", 329.63, "way"),                                   # In a one-horse open sleigh
+    ("F4", 349.23, "Oh"), ("F4", 349.23, "what"), ("F4", 349.23, "fun"), ("F4", 349.23, "it"),  # In a one-horse
+    ("F4", 349.23, "is"), ("E4", 329.63, "to"), ("E4", 329.63, "ride"),        # Open sleigh
+    ("E4", 329.63, "In a"), ("E4", 329.63, "one"), ("D4", 293.66, "horse"), ("D4", 293.66, "o-"),         # Hey! Oh what fun
+    ("E4", 329.63, "pen"), ("D4", 293.66, "sleigh"), ("G4", 392.00, "HEYs!")            # Fun it is
+]
+
+
 def play_tones():
+    index = 0
     while True:
         distance = measure_distance()
         fraction = 1-(distance - 10.0)/70.0
-        if fraction < 0.0 or fraction > 1.0:
+        if fraction > 1.0:
+            print(f"reset! (distance: {distance}, fraction: {fraction})")
+            index = 0
             continue
-        index = int(fraction * len(jjb_scale))
-        (note, frequency) = jjb_scale[index]
-        print(f"{note}, frequency: {frequency}, distance: {distance}")
+        if fraction < 0.0:
+            continue
+        (note, frequency, lyric) = jingle_bells_melody[index]
+        index = (index + 1) % len(jingle_bells_melody)
+        # scale_index = int(fraction * len(jjb_scale))
+        # (note, frequency) = jjb_scale[scale_index]
+        print(f"{lyric} {note}, frequency: {frequency}, distance: {distance}")
         buzzer.freq(int(frequency/2.0))
         buzzer.duty_u16(30000)
         utime.sleep_ms(400)
