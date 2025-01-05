@@ -4,29 +4,27 @@ import time
 
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
 def sound():
-    # cmk we don't need x, we can just use osr
-    label("top")
-    pull(block)            # Wait for an initial value from the FIFO
+    label("wait_for_nonzero")
+    pull(block)             # Wait for an initial value from the FIFO
     mov(x, osr)             # Store the frequency in X
-    jmp(not_x, "top")       # If x is zero, jump to "top"
+    jmp(not_x, "wait_for_nonzero")       # If x is zero, jump to "top"
     wrap_target()           # Start of the loop
-    mov(y, x)               # Reload the delay into Y
     set(pins, 1)            # Set the pin high
-    label("high_loop")
-    jmp(y_dec, "high_loop") # Delay
-    mov(y, x)               # Reload the delay into Y
+    label("high_voltage_loop")
+    jmp(x_dec, "high_voltage_loop") # Delay
+    mov(x, osr)               # Reload the delay into Y
     set(pins, 0)            # Set the pin low
-    label("low_loop")
-    jmp(y_dec, "low_loop")  # Delay
-    pull(noblock)           # If no value, copy x into osr
+    label("low_voltage_loop")
+    jmp(x_dec, "low_voltage_loop")  # Delay
     mov(x, osr)
-    jmp(not_x, "top")       # If x is zero, jump to "top"
+    pull(noblock)           # If no value, copy x into osr
+    jmp(not_x, "wait_for_nonzero")       # If x is zero, jump to "top"
     wrap()                  # End of the loop
 
-def main():
+def demo_sound():
     CLK_FREQ = 125_000_000  # 125 MHz
     BUZZER_PIN = 15 
-    print("Hello, world6!")
+    print("Hello, world7!")
     
     pio = rp2.PIO(0)
     pio.remove_program()
@@ -37,12 +35,12 @@ def main():
 
     try:
         while True:
-            for freq in range(100, 1000):
+            for freq in range(100, 1000, 10):
                 try:
                     half_period = int(CLK_FREQ / (2 * freq))
                     print(half_period)
                     sm.put(half_period)
-                    time.sleep_ms(25)  # Add delay between frequencies
+                    time.sleep_ms(50)  # Add delay between frequencies
                 except Exception as e:
                     print(f"Error during frequency change: {e}")
                     continue
@@ -53,6 +51,9 @@ def main():
         print(f"Unexpected error: {e}")
     finally:
         sm.active(0)  # Ensure state machine is stopped
+
+def main():
+    demo_sound()
 
 main()
 
