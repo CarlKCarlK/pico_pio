@@ -5,9 +5,9 @@ import time
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
 def sound():
     # cmk we don't need x, we can just use osr
+    label("top")
     pull(block)            # Wait for an initial value from the FIFO
     mov(x, osr)             # Store the frequency in X
-    label("top")
     jmp(not_x, "top")       # If x is zero, jump to "top"
     wrap_target()           # Start of the loop
     mov(y, x)               # Reload the delay into Y
