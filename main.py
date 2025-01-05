@@ -4,6 +4,7 @@ import time
 
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
 def sound():
+    # cmk we don't need x, we can just use osr
     pull(block)            # Wait for an initial value from the FIFO
     mov(x, osr)             # Store the frequency in X
     label("top")
@@ -25,27 +26,23 @@ def sound():
 def main():
     CLK_FREQ = 125_000_000  # 125 MHz
     BUZZER_PIN = 15 
-    print("Hello, world3!")
+    print("Hello, world6!")
     
-    try:
-        pio = rp2.PIO(0)
-        sm = rp2.StateMachine(0, sound, set_base=Pin(BUZZER_PIN))
-        # print(pio.asm_space())
-    except Exception as e:
-        print(f"Failed to initialize PIO: {e}")
-        return
+    pio = rp2.PIO(0)
+    pio.remove_program()
+    sm = rp2.StateMachine(0, sound, set_base=Pin(BUZZER_PIN))
 
     print("PIO log sweep starting...")
     sm.active(1)  # Start the PIO state machine
 
     try:
         while True:
-            for freq in [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]:
+            for freq in range(100, 1000):
                 try:
                     half_period = int(CLK_FREQ / (2 * freq))
                     print(half_period)
                     sm.put(half_period)
-                    time.sleep_ms(100)  # Add delay between frequencies
+                    time.sleep_ms(25)  # Add delay between frequencies
                 except Exception as e:
                     print(f"Error during frequency change: {e}")
                     continue
