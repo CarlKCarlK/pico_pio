@@ -178,9 +178,11 @@ def make_music():
     print("0Music starting...")
     sound_state_machine.active(1)
     distance_state_machine.active(1)
+    distance_state_machine.put(START_CYCLES)
 
     try:
         while True:
+            # print("getting distance")
             end_cycles = distance_state_machine.get()
             print("end_cycles: ", end_cycles)
             distance_cm = end_cycles_to_distance_cm(end_cycles)
@@ -188,7 +190,7 @@ def make_music():
                 sound_state_machine.put(0)
             else:
                 freq = distance_to_frequency(distance_cm)
-                half_period = CLOCK_FREQUENCY / (2 * freq)
+                half_period = int(CLOCK_FREQUENCY / (2 * freq))
                 sound_state_machine.put(half_period)
     except KeyboardInterrupt:
         sound_state_machine.active(0)
@@ -199,10 +201,10 @@ def make_music():
         sound_state_machine.active(0)  # Ensure state machine is stopped
 
 def main():
-    print("main0")
+    print("main1")
     # demo_sound()
-    demo_distance()
-    # make_music()
+    # demo_distance()
+    make_music()
 
 main()
 
