@@ -72,102 +72,9 @@ twinkle_twinkle = [
 
 ]
 
-
-BEETHOVEN_5TH = [
-    # Opening motif (repeated)
-    (392, 150), (392, 150), (392, 150), (311, 450),  # G G G Eb
-    (0, 150),
-    (349, 150), (349, 150), (349, 150), (294, 450),  # F F F D
-    (0, 150),
-    
-    # Second phrase
-    (392, 150), (392, 150), (392, 150), (311, 450),  # G G G Eb
-    (0, 150),
-    (349, 150), (349, 150), (349, 150), (294, 450),  # F F F D
-    (0, 150),
-    
-    # Development
-    (392, 300), (349, 300), (311, 300), (294, 600),  # G F Eb D
-    (0, 300),
-    (311, 300), (349, 300), (392, 300), (349, 600),  # Eb F G F
-    (0, 300),
-    
-    # Heroic theme
-    (392, 600), (440, 200), (440, 600),  # G A A
-    (392, 300), (349, 300), (311, 600),  # G F Eb
-    (294, 600), (311, 200), (349, 600),  # D Eb F
-    
-    # Triumphant section
-    (392, 800), (440, 400), (494, 800),  # G A B
-    (523, 1200), (0, 400),               # C (long)
-    (392, 400), (440, 400), (494, 400),  # G A B
-    (523, 1200), (0, 400),               # C (long)
-    
-    # Conclusion
-    (392, 300), (349, 300), (311, 300),  # G F Eb
-    (294, 900), (0, 300),                # D (long)
-    (392, 600), (349, 600),              # G F
-    (311, 1200)                          # Eb (final)
-]
-
-mary_had_a_little_lamb = [
-    # Bar 1
-    (330, 400),  # E
-    (294, 400),  # D
-    (262, 400),  # C
-    (294, 400),  # D
-    (330, 400),  # E
-    (330, 400),  # E
-    (330, 800),  # E (long)
-
-    # Bar 2
-    (294, 400),  # D
-    (294, 400),  # D
-    (294, 800),  # D (long)
-    (330, 400),  # E
-    (349, 400),  # F
-    (349, 800),  # F (long)
-
-    # Bar 3
-    (330, 400),  # E
-    (294, 400),  # D
-    (262, 400),  # C
-    (294, 400),  # D
-    (330, 400),  # E
-    (330, 400),  # E
-    (330, 400),  # E
-    (0, 800),    # Rest (long pause)
-]
-
-flight_of_the_bumblebee = [
-    (523, 200),  # C5
-    (587, 200),  # D5
-    (622, 200),  # E♭5
-    (698, 200),  # F5
-    (740, 200),  # G♭5
-    (784, 200),  # G5
-    (740, 200),  # G♭5
-    (698, 200),  # F5
-    (622, 200),  # E♭5
-    (587, 200),  # D5
-    (523, 200),  # C5
-    (494, 200),  # B4
-    (523, 200),  # C5
-    (587, 200),  # D5
-    (698, 200),  # F5
-    (622, 200),  # E♭5
-    (784, 200),  # G5
-    (698, 200),  # F5
-    (622, 200),  # E♭5
-    (587, 200),  # D5
-    (523, 200),  # C5
-]
-
-
-
-
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
 def sound():
+    # Wait for non-zero delay value
     # Wait for non-zero delay value.
     label("wait_for_nonzero")
     pull(block)                     # Wait for a delay value, keep it in osr.
@@ -191,41 +98,33 @@ def sound():
     wrap()                          # Continue playing the sound.
 
 def demo_sound():
-    print("Hello, world8!")
-    
     pio0 = rp2.PIO(0)
     pio0.remove_program()
     sound_state_machine = rp2.StateMachine(0, sound, set_base=Pin(BUZZER_PIN))
 
-    print("PIO log sweep starting...") # cmk
-    sound_state_machine.active(1)  # Start the PIO state machine
-
-    gap = 50
     try:
+        sound_state_machine.active(1)
         while True:
             for (frequency, ms, lyric) in twinkle_twinkle:
-                try:
-                    print(lyric)
-                    if frequency > 0:
-                        half_period = int(CLOCK_FREQUENCY / (2 * frequency))
-                        sound_state_machine.put(half_period)
-                        time.sleep_ms(ms)  # Add delay between frequencies
-                        sound_state_machine.put(0)
-                        time.sleep_ms(gap)  # Add delay between frequencies
-                    else:
-                        sound_state_machine.put(0)
-                        time.sleep_ms(ms+gap)  # Add delay between frequencies
-                except Exception as e:
-                    print(f"Error during frequency change: {e}")
-                    continue
+                print(lyric)
+                if frequency > 0:
+                    # Pack both delays into one 32-bit word
+                    # Both high and low delays are half period
+                    half_period = int(CLOCK_FREQUENCY / (2 * frequency)) & 0xFFFF
+                    packed_delays = (half_period << 16) | half_period
+                    sound_state_machine.put(packed_delays)
+                    time.sleep_ms(ms)
+                    sound_state_machine.put(0)
+                    time.sleep_ms(50)
+                else:
+                    sound_state_machine.put(0)
+                    time.sleep_ms(ms + 50)
             time.sleep_ms(1000)
     except KeyboardInterrupt:
-        sound_state_machine.active(0)
         print("Sound demo stopped.")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
     finally:
-        sound_state_machine.active(0)  # Ensure state machine is stopped
+        sound_state_machine.active(0)
+
 
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
 def distance():
