@@ -3,7 +3,6 @@ from machine import Pin
 import time
 
 CLOCK_FREQUENCY = 125_000_000  # 125 MHz
-SOUND_FREQ = 3906250
 BUZZER_PIN = 15 
 START_CYCLES = 400_000
 ECHO_PIN = 16
@@ -88,15 +87,11 @@ def sound():
     wrap_target()                   # Start of the play-the-sound loop.
 
     set(pins, 1)                    # Set the buzzer to high voltage.
-    mov(isr, osr)
-    out(x, 16)
-   
     label("high_voltage_loop")
     jmp(x_dec, "high_voltage_loop") # Delay
-    set(pins, 0)                    # Set the buzzer to low voltage.
-    out(x, 16)
-    mov(osr, isr)
 
+    set(pins, 0)                    # Set the buzzer to low voltage.
+    mov(x, osr)
     label("low_voltage_loop")
     jmp(x_dec, "low_voltage_loop")  # Delay
 
@@ -107,39 +102,10 @@ def sound():
     jmp(not_x, "wait_for_nonzero")  # If x is zero, wait for a non-zero value.
     wrap()                          # Continue playing the sound.
 
-# @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
-# def sound():
-#     # Wait for non-zero delay value.
-#     label("wait_for_nonzero")
-#     pull(block)                     # Wait for a delay value, keep it in osr.
-#     mov(x, osr)                     # Copy the delay into x.
-#     jmp(not_x, "wait_for_nonzero")  # If delay is zero, wait for a non-zero value.
-
-#     # Play the sound.
-#     wrap_target()                   # Start of the play-the-sound loop.
-
-#     mov(isr, osr)
-#     out(x, 16)
-    
-#     set(pins, 1)                    # Set the buzzer to high voltage.
-#     label("high_voltage_loop")
-#     jmp(x_dec, "high_voltage_loop") # Delay
-#     set(pins, 0)                    # Set the buzzer to low voltage.
-#     out(x, 16)                      # Reload the delay into x.
-#     label("low_voltage_loop")
-#     jmp(x_dec, "low_voltage_loop")  # Delay
-
-#     # Read a new delay value or keep the current one.
-#     mov(x, osr)                     # set x, the default value for "pull(nonblock)"
-#     pull(noblock)                   # Read a new delay value or use the default.
-#     mov(x, osr)      # cmk
-#     jmp(not_x, "wait_for_nonzero")  # If x is zero, wait for a non-zero value.
-#     wrap()                          # Continue playing the sound.
-
 def demo_sound():
     pio0 = rp2.PIO(0)
     pio0.remove_program()
-    sound_state_machine = rp2.StateMachine(0, sound, freq=SOUND_FREQ, set_base=Pin(BUZZER_PIN))
+    sound_state_machine = rp2.StateMachine(0, sound,set_base=Pin(BUZZER_PIN))
 
     try:
         sound_state_machine.active(1)
@@ -147,21 +113,15 @@ def demo_sound():
             for (frequency, ms, lyric) in twinkle_twinkle:
                 print(lyric)
                 if frequency > 0:
-                    # Pack both delays into one 32-bit word
-                    # Both high and low delays are half period
-                    half_period = int(SOUND_FREQ / (2 * frequency))
-                    assert half_period < 2**16, f"Frequency too low {frequency}"
-                    packed_delays = (half_period << 16) | half_period
-                    # packed_delays = half_period
-                    print(f"Frequency: {frequency}, half_period: {half_period}, packed_delays: {packed_delays:x}")
-                    sound_state_machine.put(packed_delays)
+                    half_period = int(CLOCK_FREQUENCY / frequency / 2)
+                    print(f"Frequency: {frequency}, half_period: {half_period}")
+                    sound_state_machine.put(half_period)
                     time.sleep_ms(ms)
                     sound_state_machine.put(0)
                     time.sleep_ms(50)
                 else:
                     sound_state_machine.put(0)
                     time.sleep_ms(ms + 50)
-            # cmk time.sleep_ms(1000)
     except KeyboardInterrupt:
         print("Sound demo stopped.")
     finally:
