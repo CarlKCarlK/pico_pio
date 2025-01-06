@@ -10,9 +10,159 @@ TRIGGER_PIN = 17
 # (2 cycles per loop) * (34300 cm/s) / cycles_per_second / 2 (there and back)
 CM_PER_LOOP = 2 * 34300.0 / CLOCK_FREQUENCY / 2.0
 
+# cmk better names
 F_LOW = 123.47  # Precomputed lower frequency (~123.47 Hz)
 N_OCTAVES = 2.5 #  Total number of octaves
 D_MAX = 100.0   # Maximum distance in cm
+
+twinkle_twinkle = [
+    # Bar 1
+    (262, 400, "Twin-"),  # C
+    (262, 400, "-kle"),   # C
+    (392, 400, "twin-"),  # G
+    (392, 400, "-kle"),   # G
+    (440, 400, "lit-"),   # A
+    (440, 400, "-tle"),   # A
+    (392, 800, "star"),   # G
+
+    # Bar 2
+    (349, 400, "How"),    # F
+    (349, 400, "I"),      # F
+    (330, 400, "won-"),   # E
+    (330, 400, "-der"),   # E
+    (294, 400, "what"),   # D
+    (294, 400, "you"),    # D
+    (262, 800, "are"),    # C
+
+    # Bar 3
+    (392, 400, "Up"),     # G
+    (392, 400, "a-"),     # G
+    (349, 400, "-bove"),  # F
+    (349, 400, "the"),    # F
+    (330, 400, "world"),  # E
+    (330, 400, "so"),     # E
+    (294, 800, "high"),   # D
+
+    # Bar 4 
+    (392, 400, "Like"),   # G
+    (392, 400, "a"),      # G
+    (349, 400, "dia-"),   # F
+    (349, 400, "-mond"),  # F
+    (330, 400, "in"),     # E
+    (330, 400, "the"),    # E
+    (294, 800, "sky"),    # D
+
+    # Bar 1 (repeat)
+    (262, 400, "Twin-"),  # C
+    (262, 400, "-kle"),   # C
+    (392, 400, "twin-"),  # G
+    (392, 400, "-kle"),   # G
+    (440, 400, "lit-"),   # A
+    (440, 400, "-tle"),   # A
+    (392, 800, "star"),   # G
+
+    # Bar 2 (repeat)
+    (349, 400, "How"),    # F
+    (349, 400, "I"),      # F
+    (330, 400, "won-"),   # E
+    (330, 400, "-der"),   # E
+    (294, 400, "what"),   # D
+    (294, 400, "you"),    # D
+    (262, 800, "are"),    # C
+
+]
+
+
+BEETHOVEN_5TH = [
+    # Opening motif (repeated)
+    (392, 150), (392, 150), (392, 150), (311, 450),  # G G G Eb
+    (0, 150),
+    (349, 150), (349, 150), (349, 150), (294, 450),  # F F F D
+    (0, 150),
+    
+    # Second phrase
+    (392, 150), (392, 150), (392, 150), (311, 450),  # G G G Eb
+    (0, 150),
+    (349, 150), (349, 150), (349, 150), (294, 450),  # F F F D
+    (0, 150),
+    
+    # Development
+    (392, 300), (349, 300), (311, 300), (294, 600),  # G F Eb D
+    (0, 300),
+    (311, 300), (349, 300), (392, 300), (349, 600),  # Eb F G F
+    (0, 300),
+    
+    # Heroic theme
+    (392, 600), (440, 200), (440, 600),  # G A A
+    (392, 300), (349, 300), (311, 600),  # G F Eb
+    (294, 600), (311, 200), (349, 600),  # D Eb F
+    
+    # Triumphant section
+    (392, 800), (440, 400), (494, 800),  # G A B
+    (523, 1200), (0, 400),               # C (long)
+    (392, 400), (440, 400), (494, 400),  # G A B
+    (523, 1200), (0, 400),               # C (long)
+    
+    # Conclusion
+    (392, 300), (349, 300), (311, 300),  # G F Eb
+    (294, 900), (0, 300),                # D (long)
+    (392, 600), (349, 600),              # G F
+    (311, 1200)                          # Eb (final)
+]
+
+mary_had_a_little_lamb = [
+    # Bar 1
+    (330, 400),  # E
+    (294, 400),  # D
+    (262, 400),  # C
+    (294, 400),  # D
+    (330, 400),  # E
+    (330, 400),  # E
+    (330, 800),  # E (long)
+
+    # Bar 2
+    (294, 400),  # D
+    (294, 400),  # D
+    (294, 800),  # D (long)
+    (330, 400),  # E
+    (349, 400),  # F
+    (349, 800),  # F (long)
+
+    # Bar 3
+    (330, 400),  # E
+    (294, 400),  # D
+    (262, 400),  # C
+    (294, 400),  # D
+    (330, 400),  # E
+    (330, 400),  # E
+    (330, 400),  # E
+    (0, 800),    # Rest (long pause)
+]
+
+flight_of_the_bumblebee = [
+    (523, 200),  # C5
+    (587, 200),  # D5
+    (622, 200),  # E♭5
+    (698, 200),  # F5
+    (740, 200),  # G♭5
+    (784, 200),  # G5
+    (740, 200),  # G♭5
+    (698, 200),  # F5
+    (622, 200),  # E♭5
+    (587, 200),  # D5
+    (523, 200),  # C5
+    (494, 200),  # B4
+    (523, 200),  # C5
+    (587, 200),  # D5
+    (698, 200),  # F5
+    (622, 200),  # E♭5
+    (784, 200),  # G5
+    (698, 200),  # F5
+    (622, 200),  # E♭5
+    (587, 200),  # D5
+    (523, 200),  # C5
+]
+
 
 
 
@@ -50,17 +200,25 @@ def demo_sound():
     print("PIO log sweep starting...") # cmk
     sound_state_machine.active(1)  # Start the PIO state machine
 
+    gap = 50
     try:
         while True:
-            for freq in range(100, 1000, 10):
+            for (frequency, ms, lyric) in twinkle_twinkle:
                 try:
-                    half_period = int(CLOCK_FREQUENCY / (2 * freq))
-                    print(half_period)
-                    sound_state_machine.put(half_period)
-                    time.sleep_ms(50)  # Add delay between frequencies
+                    print(lyric)
+                    if frequency > 0:
+                        half_period = int(CLOCK_FREQUENCY / (2 * frequency))
+                        sound_state_machine.put(half_period)
+                        time.sleep_ms(ms)  # Add delay between frequencies
+                        sound_state_machine.put(0)
+                        time.sleep_ms(gap)  # Add delay between frequencies
+                    else:
+                        sound_state_machine.put(0)
+                        time.sleep_ms(ms+gap)  # Add delay between frequencies
                 except Exception as e:
                     print(f"Error during frequency change: {e}")
                     continue
+            time.sleep_ms(1000)
     except KeyboardInterrupt:
         sound_state_machine.active(0)
         print("Sound demo stopped.")
@@ -79,7 +237,9 @@ def distance():
     jmp(x_dec, "unused")
 
     # Read the max echo wait into osr.
-    pull()                          
+    pull()
+    # set(x, 400000)
+    # mov(osr, x)
     
     # Take a measurement loop
     wrap_target()
@@ -177,7 +337,9 @@ def make_music():
 
     print("0Music starting...")
     sound_state_machine.active(1)
+    print("1Music starting...")
     distance_state_machine.active(1)
+    print("2Music starting...")
     distance_state_machine.put(START_CYCLES)
 
     try:
@@ -201,10 +363,10 @@ def make_music():
         sound_state_machine.active(0)  # Ensure state machine is stopped
 
 def main():
-    print("main1")
-    # demo_sound()
+    print("main3")
+    demo_sound()
     # demo_distance()
-    make_music()
+    # make_music()
 
 main()
 
