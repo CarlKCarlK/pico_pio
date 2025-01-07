@@ -1,9 +1,78 @@
 import rp2
+import machine
 from machine import Pin
 import time
 
-CLOCK_FREQUENCY = 125_000_000  # 125 MHz
+CLOCK_FREQUENCY =  machine.freq()
 BUZZER_PIN = 15 
+
+
+@rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
+def two_tone():
+    pull(block)                     # Wait for a delay value, keep it in osr.
+    mov(isr, osr)
+    pull(block)                     # Wait for a delay value, keep it in osr.
+
+    wrap_target()                   # Start of the play-the-sound loop.
+
+    # play the high sound
+    mov(x, osr)
+    label("0")
+    set(pins, 1)                    # Set the buzzer to high voltage.
+    mov(y, isr)
+    label("01")
+    jmp(y_dec, "01") # Delay
+    mov(y, isr)
+    set(pins, 0)                    # Set the buzzer to low voltage.
+    label("00")
+    jmp(y_dec, "00")  # Delay
+    jmp(x_dec, "0")                 # Repeat the sound.
+
+    mov(x, osr)
+    label("2")
+    set(pins, 1)                    # Set the buzzer to high voltage.
+    mov(y, isr)
+    label("21")
+    jmp(y_dec, "21") # Delay
+    mov(y, isr)
+    set(pins, 0)                    # Set the buzzer to low voltage.
+    label("20")
+    jmp(y_dec, "20")  # Delay
+    jmp(x_dec, "2")                 # Repeat the sound.
+
+    mov(x, osr)
+    label("1")
+    set(pins, 1)                    # Set the buzzer to high voltage.
+    mov(y, isr)
+    label("11")
+    jmp(y_dec, "11")[1] # Delay
+    mov(y, isr)
+    set(pins, 0)                    # Set the buzzer to low voltage.
+    label("10")
+    jmp(y_dec, "10")[1]  # Delay
+    jmp(x_dec, "1")                 # Repeat the sound.
+    wrap()                          # Continue playing the sound.
+
+def demo_two_tone():
+    print("Hello, two_tone!0")
+    pio0 = rp2.PIO(0)
+    pio0.remove_program()
+    two_tone_state_machine = rp2.StateMachine(0, two_tone, set_base=Pin(BUZZER_PIN))
+    try:
+        two_tone_state_machine.active(1)
+        high_tone_half_period = int(CLOCK_FREQUENCY / 750 / 2)
+        high_tone_repeat = 100
+        print(f"high_tone_half_period: {high_tone_half_period}, high_tone_repeat: {high_tone_repeat}")
+        two_tone_state_machine.put(high_tone_half_period)
+        two_tone_state_machine.put(high_tone_repeat)
+        time.sleep_ms(5_000)
+    except KeyboardInterrupt:
+        print("two_tone demo stopped.")
+    finally:
+        two_tone_state_machine.active(0)
+
+demo_two_tone()
+
 START_CYCLES = 400_000
 ECHO_PIN = 16
 TRIGGER_PIN = 17
@@ -177,11 +246,11 @@ def distance():
     mov(x, y)                       # Save the result in x
     
     # Cool down period before next measurement
-    # about 30 ms (9 times 400,000 / 125,000,000)
+    # about 30 ms (10 times 400,000 / 150,000,000)
     label("cooldown_cycle")
     mov(y, osr)                     # Load cool down counter
     label("cooldown_loop")
-    jmp(y_dec, "cooldown_loop") [8] # Wait before next measurement
+    jmp(y_dec, "cooldown_loop") [9] # Wait before next measurement
     wrap()                          # Restart the measurement loop
 
 def demo_distance():
@@ -269,5 +338,5 @@ def main():
     # demo_distance()
     # make_music()
 
-main()
+# main()
 
