@@ -8,70 +8,57 @@ BUZZER_PIN = 15
 
 
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
-def two_tone():
-    pull(block)                     # Wait for a delay value, keep it in osr.
-    mov(isr, osr)
-    pull(block)                     # Wait for a delay value, keep it in osr.
+def back_up():
+    pull(block)                     # Read the half period of the beep sound.
+    mov(isr, osr)                   # Store the half period in ISR.
+    pull(block)                     # Read the number of beep cycles.
 
-    wrap_target()                   # Start of the play-the-sound loop.
+    wrap_target()                   # Start of the main loop.
 
-    # play the high sound
-    mov(x, osr)
-    label("0")
-    set(pins, 1)                    # Set the buzzer to high voltage.
-    mov(y, isr)
-    label("01")
-    jmp(y_dec, "01") # Delay
-    mov(y, isr)
-    set(pins, 0)                    # Set the buzzer to low voltage.
-    label("00")
-    jmp(y_dec, "00")  # Delay
-    jmp(x_dec, "0")                 # Repeat the sound.
+    # Generate the beep sound.
+    mov(x, osr)                     # Load the number of beep cycles into X.
+    label("beep_loop")
 
-    mov(x, osr)
-    label("2")
-    set(pins, 1)                    # Set the buzzer to high voltage.
-    mov(y, isr)
-    label("21")
-    jmp(y_dec, "21") # Delay
-    mov(y, isr)
-    set(pins, 0)                    # Set the buzzer to low voltage.
-    label("20")
-    jmp(y_dec, "20")  # Delay
-    jmp(x_dec, "2")                 # Repeat the sound.
+    mov(y, isr)                     # Load the half period into Y.
+    set(pins, 1)                    # Set the buzzer to high voltage (start the tone).
+    label("beep_high_delay")
+    jmp(y_dec, "beep_high_delay")   # Delay for the half period.
+    mov(y, isr)                     # Load the half period into Y.
+    set(pins, 0)                    # Set the buzzer to low voltage (end the tone).
+    label("beep_low_delay")
+    jmp(y_dec, "beep_low_delay")    # Delay for the low duration.
 
-    mov(x, osr)
-    label("1")
-    set(pins, 1)                    # Set the buzzer to high voltage.
-    mov(y, isr)
-    label("11")
-    jmp(y_dec, "11")[1] # Delay
-    mov(y, isr)
-    set(pins, 0)                    # Set the buzzer to low voltage.
-    label("10")
-    jmp(y_dec, "10")[1]  # Delay
-    jmp(x_dec, "1")                 # Repeat the sound.
-    wrap()                          # Continue playing the sound.
+    jmp(x_dec, "beep_loop")         # Repeat the beep cycles.
 
-def demo_two_tone():
-    print("Hello, two_tone!0")
+    # Silence between beeps.
+    mov(x, osr)                     # Load the number of silence cycles into X.
+    label("silence_loop")
+
+    mov(y, isr)                     # Load the silence duration into Y.
+    label("silence_delay")
+    jmp(y_dec, "silence_delay")[1]  # Delay for the silence duration.
+
+    jmp(x_dec, "silence_loop")      # Repeat the silence cycles.
+    
+def demo_back_up():
+    print("Hello, back_up!0")
     pio0 = rp2.PIO(0)
     pio0.remove_program()
-    two_tone_state_machine = rp2.StateMachine(0, two_tone, set_base=Pin(BUZZER_PIN))
+    back_up_state_machine = rp2.StateMachine(0, back_up, set_base=Pin(BUZZER_PIN))
     try:
-        two_tone_state_machine.active(1)
-        high_tone_half_period = int(CLOCK_FREQUENCY / 750 / 2)
-        high_tone_repeat = 100
+        back_up_state_machine.active(1)
+        high_tone_half_period = int(CLOCK_FREQUENCY / 1000 / 2)
+        high_tone_repeat = int(CLOCK_FREQUENCY * .5 / (high_tone_half_period * 2))
         print(f"high_tone_half_period: {high_tone_half_period}, high_tone_repeat: {high_tone_repeat}")
-        two_tone_state_machine.put(high_tone_half_period)
-        two_tone_state_machine.put(high_tone_repeat)
+        back_up_state_machine.put(high_tone_half_period)
+        back_up_state_machine.put(high_tone_repeat)
         time.sleep_ms(5_000)
     except KeyboardInterrupt:
-        print("two_tone demo stopped.")
+        print("back_up demo stopped.")
     finally:
-        two_tone_state_machine.active(0)
+        back_up_state_machine.active(0)
 
-demo_two_tone()
+demo_back_up()
 
 START_CYCLES = 400_000
 ECHO_PIN = 16
