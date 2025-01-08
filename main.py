@@ -33,6 +33,8 @@ def back_up():
 
     jmp(x_dec, "silence_loop")      # Repeat the silence loop.
 
+    wrap()                          # End of the main loop, jumps back to wrap_target for continuous execution.
+
 import machine
 from machine import Pin
 import time
