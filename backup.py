@@ -47,6 +47,7 @@ def demo_back_up():
     pio0 = rp2.PIO(0) 
     pio0.remove_program() 
     back_up_state_machine = rp2.StateMachine(0, back_up, set_base=Pin(BUZZER_PIN))    
+
     try:
         back_up_state_machine.active(1)
         half_period = int(CLOCK_FREQUENCY / 1000 / 2)
