@@ -37,7 +37,7 @@ def distance():
     # will be u32::MAX if the echo timed out.
     label("measurement_complete")
     jmp(x_not_y, "send_result")     # if measurement is different, then sent it.
-    jmp("cooldown_cycle")           # If measurement is the same, don't send.
+    jmp("cooldown")           # If measurement is the same, don't send.
     # Send the measurement
     label("send_result")
     mov(isr, y)                     # Store result in ISR
@@ -45,9 +45,6 @@ def distance():
     mov(x, y)                       # Save the result in x
     
     # Cool down period before next measurement
-    # about 30 ms (10 times 400,000 / 150,000,000)
-    label("cooldown_cycle")
-    mov(y, osr)                     # Load cool down counter
-    label("cooldown_loop")
-    jmp(y_dec, "cooldown_loop") [9] # Wait before next measurement
+    label("cooldown")
+    wait(0, pin, 0)                 # Wait for echo pin to be low
     wrap()                          # Restart the measurement loop
