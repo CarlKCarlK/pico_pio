@@ -15,34 +15,40 @@ def distance():
     # Main loop
     wrap_target()
 
-    # Generate 10μs trigger pulse (1500 cycles at 150MHz)
-    set(pins, 1)                    # Set trigger pin to high voltage
-    set(y, 30)                      # Setup loop counter (30 × 50 cycles = 1500)
-    label("trigger_pulse_loop")
-    nop() [31]                      # Delay 32 cycles
-    jmp(y_dec, "trigger_pulse_loop") [17]  # 18 cycles (50 total per iteration)
+    # # Initialize Y to 500
+    # set(y, 0)          # Clear y (initialize to 0)
+    # mov(isr, y)        # Clear ISR (initialize to 0)
+    # set(y, 15)         # Load higher 5 bits (15 = 0b01111) into y
+    # in_(y, 5)          # Shift ISR left by 5 bits and insert y (ISR = 0b00001111)
+    # set(y, 20)         # Load lower 5 bits (20 = 0b10100) into y
+    # in_(y, 5)          # Shift ISR left by 5 bits and insert y (ISR = 0b0111110100 = 500)
+    # mov(y, isr)        # Move final value (500) from ISR to y
+
+
+    # Generate 10μs trigger pulse (4 cycles at 343_000Hz)
+    set(pins, 1)[3]                 # Set trigger pin to high voltage
     set(pins, 0)                    # Set trigger pin to low voltage
     
-    # Count down the echo wait
+    # When the trigger goes high, start counting down until it goes low
     wait(1, pin, 0)                 # Wait for echo pin to be high voltage
-    mov(y, osr)                     # Load max echo wait into y
+    mov(y, osr)                     # Load max echo wait into Y
     label("measure_echo_loop")
-    jmp(pin, "echo_active")          # if echo voltage is high continue count down
-    jmp("measurement_complete")      # if echo voltage is low, measurement is complete
+    jmp(pin, "echo_active")         # if echo voltage is high continue count down
+    jmp("measurement_complete")     # if echo voltage is low, measurement is complete
     label("echo_active")
-    jmp(y_dec, "measure_echo_loop")  # Continue counting down unless timeout
+    jmp(y_dec, "measure_echo_loop") # Continue counting down unless timeout
     
     
-    # y tells where the echo countdown stopped. It
+    # Y tells where the echo countdown stopped. It
     # will be u32::MAX if the echo timed out.
     label("measurement_complete")
     jmp(x_not_y, "send_result")     # if measurement is different, then sent it.
-    jmp("cooldown")           # If measurement is the same, don't send.
+    jmp("cooldown")                 # If measurement is the same, don't send.
     # Send the measurement
     label("send_result")
     mov(isr, y)                     # Store result in ISR
     push()                          # Send to FIFO
-    mov(x, y)                       # Save the result in x
+    mov(x, y)                       # Save the result in X
     
     # Cool down period before next measurement
     label("cooldown")

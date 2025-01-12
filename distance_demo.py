@@ -1,6 +1,7 @@
 import rp2
 import machine
 from machine import Pin
+import math
 
 
 from distance_pio import distance
@@ -14,6 +15,9 @@ CM_PRECISION = 0.1
 STATE_MACHINE_FREQUENCY = int(2 * 34300.0 / CM_PRECISION / 2.0)
 MAX_LOOPS = int(CM_MAX / CM_PRECISION)
 print(f"STATE_MACHINE_FREQUENCY: {STATE_MACHINE_FREQUENCY}, MAX_LOOPS: {MAX_LOOPS}")
+# 10 μs trigger pulse is # cycles at STATE_MACHINE_FREQUENCY
+TEN_μs = math.ceil(10e-6 * STATE_MACHINE_FREQUENCY)
+print(f"TEN_μs: {TEN_μs}")
 
 
 def demo_distance():
