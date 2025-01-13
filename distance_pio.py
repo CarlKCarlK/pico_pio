@@ -32,13 +32,31 @@ def distance():
     # When the trigger goes high, start counting down until it goes low
     wait(1, pin, 0)                 # Wait for echo pin to be high voltage
     mov(y, osr)                     # Load max echo wait into Y
+
+    # WISH
+    label("measure_echo_loop")
+    jmp(not pin, "measurement_complete") # if echo voltage is low, measurement is complete
+    jmp(y_dec, "measure_echo_loop")   # Continue counting down unless timeout
+
+
+    # ACTUAL
     label("measure_echo_loop")
     jmp(pin, "echo_active")         # if echo voltage is high continue count down
     jmp("measurement_complete")     # if echo voltage is low, measurement is complete
     label("echo_active")
     jmp(y_dec, "measure_echo_loop") # Continue counting down unless timeout
+
+    # WISH
+    # Y tells where the echo countdown stopped. It
+    # will be u32::MAX if the echo timed out.
+    label("measurement_complete")
+    jmp(x_eq_y, "cooldown")        # If measurement is the same, skip to cool down
+    mov(isr, y)                    # Store measurement in ISR
+    push()                         # Output ISR
+    mov(x, y)                      # Save the measurement in X
+
     
-    
+    # ACTUAL
     # Y tells where the echo countdown stopped. It
     # will be u32::MAX if the echo timed out.
     label("measurement_complete")
@@ -46,9 +64,9 @@ def distance():
     jmp("cooldown")                 # If measurement is the same, don't send.
     # Send the measurement
     label("send_result")
-    mov(isr, y)                     # Store result in ISR
-    push()                          # Send to FIFO
-    mov(x, y)                       # Save the result in X
+    mov(isr, y)                    # Store measurement in ISR
+    push()                         # Output ISR
+    mov(x, y)                      # Save the measurement in X
     
     # Cool down period before next measurement
     label("cooldown")
