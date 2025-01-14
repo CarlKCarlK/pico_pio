@@ -6,8 +6,6 @@ import math
 
 from distance_pio import distance
 
-ECHO_PIN = 16
-TRIGGER_PIN = 17
 
 CM_MAX = 50
 CM_PRECISION = 0.1
@@ -17,7 +15,7 @@ MAX_LOOPS = int(CM_MAX / CM_PRECISION)
 print(f"STATE_MACHINE_FREQUENCY: {STATE_MACHINE_FREQUENCY}, MAX_LOOPS: {MAX_LOOPS}")
 # 10 μs trigger pulse is # cycles at STATE_MACHINE_FREQUENCY
 TEN_μs = math.ceil(10e-6 * STATE_MACHINE_FREQUENCY)
-print(f"TEN_μs: {TEN_μs}")
+print(f"TEN_microseconds: {TEN_μs} cycles")
 
 
 def demo_distance():
@@ -25,9 +23,17 @@ def demo_distance():
     
     pio1 = rp2.PIO(1)
     pio1.remove_program()
+    ECHO_PIN = 16
+    TRIGGER_PIN = 17
     trigger = Pin(TRIGGER_PIN, Pin.OUT)
     echo = Pin(ECHO_PIN, Pin.IN)
-    distance_state_machine = rp2.StateMachine(4, distance, freq=STATE_MACHINE_FREQUENCY, set_base=trigger, in_base=echo, jmp_pin=echo)
+    distance_state_machine = rp2.StateMachine(
+                                    4,                 # PIO Block 1, State machine 4
+                                    distance,          # PIO program
+                                    freq=STATE_MACHINE_FREQUENCY,
+                                    in_base=echo,
+                                    set_base=trigger,
+                                    jmp_pin=echo)
 
     try:
         distance_state_machine.active(1)  # Start the PIO state machine
@@ -42,6 +48,7 @@ def demo_distance():
         distance_state_machine.active(0)
 
 def end_cycles_to_distance_cm(end_cycles):
+
     if end_cycles == 0xFFFFFFFF:
         return None
     distance_cm = (MAX_LOOPS - end_cycles) * CM_PRECISION
