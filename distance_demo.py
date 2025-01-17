@@ -19,7 +19,7 @@ print(f"TEN_microseconds: {TEN_μs} cycles")
 
 
 def demo_distance():
-    print("Hello, distance!")
+    print("Hello, distance2!")
     
     pio1 = rp2.PIO(1)
     pio1.remove_program()
@@ -40,6 +40,7 @@ def demo_distance():
         distance_state_machine.put(MAX_LOOPS)
         while True:
             end_cycles = distance_state_machine.get()
+            print(end_cycles)
             distance_cm = end_cycles_to_distance_cm(end_cycles)
             print(f"Distance: {distance_cm} cm, end_cycles: {end_cycles}")
     except KeyboardInterrupt:
