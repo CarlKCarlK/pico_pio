@@ -37,13 +37,13 @@ def theremin():
         in_base=echo,
         jmp_pin=echo,
     )
-
-    sound_state_machine.active(1)
-    distance_state_machine.active(1)
     max_loops = int(CM_MAX / CM_PRECISION)
-    distance_state_machine.put(max_loops)
 
     try:
+        sound_state_machine.active(1)
+        distance_state_machine.active(1)
+        distance_state_machine.put(max_loops)
+
         while True:
             end_loops = distance_state_machine.get()
             distance_cm = loop_difference_to_distance_cm(max_loops, end_loops)
@@ -60,6 +60,7 @@ def theremin():
         print("theremin stopped.")
     finally:
         sound_state_machine.active(0)
+        distance_state_machine.active(0)
 
 
 def loop_difference_to_distance_cm(max_loops, end_loops):
