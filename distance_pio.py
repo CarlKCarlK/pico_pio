@@ -9,19 +9,9 @@ def distance():
     label("subtraction_trick")
     jmp(x_dec, "subtraction_trick")
 
-    # DEBUG: See the value of X
-    mov(isr, x)
-    push()
-
     # Read the max echo wait into OSR.
     pull() # same as pull(block)
 
-    # DEBUG: Send constant value
-    set(y, 7)      # Push '42' so we know we've reached this point
-    mov(isr, y)     # Then move Y to ISR
-    push()
-
-    
     # Main loop
     wrap_target()
 
