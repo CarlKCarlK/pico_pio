@@ -51,9 +51,7 @@ def theremin():
                 sound_state_machine.put(0)
             else:
                 tone_frequency = distance_to_tone_frequency(distance_cm)
-                print(
-                    f"Distance: {distance_cm} cm, tone frequency: {tone_frequency} Hz"
-                )
+                print(f"Distance: {distance_cm} cm, tone: {tone_frequency} Hz")
                 half_period = int(sound_state_machine_frequency / (2 * tone_frequency))
                 sound_state_machine.put(half_period)
     except KeyboardInterrupt:
