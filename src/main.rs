@@ -1,25 +1,17 @@
-//! Runs on a Raspberry Pi Pico RP2040. See the `README.md` for more information.
 #![no_std]
 #![no_main]
-#![allow(
-    clippy::future_not_send,
-    reason = "Safe in single-threaded, bare-metal embedded context"
-)]
-
-use panic_probe as _;
 
 use defmt::info;
 use defmt_rtt as _;
 use derive_more::derive::{Display, Error, From};
 use embassy_executor::Spawner;
-use embassy_rp::bind_interrupts;
-use embassy_rp::config::Config as Rp_Config;
-use embassy_rp::pio::InterruptHandler;
-use embassy_rp::pio::{Config, Direction};
 use embassy_rp::{
+    bind_interrupts,
+    config::Config as Rp_Config,
     peripherals::{PIN_15, PIN_16, PIN_17, PIO0, PIO1},
-    pio::Pio,
+    pio::{Config, Direction, InterruptHandler, Pio},
 };
+use embassy_time::{Duration, Timer};
 use libm::powf;
 use panic_probe as _;
 use pio_proc::pio_file;
@@ -27,8 +19,45 @@ use pio_proc::pio_file;
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
     // If it returns, something went wrong.
-    let err = inner_main(spawner).await.unwrap_err();
+    let err = inner_main_backup_demo(spawner).await.unwrap_err();
     panic!("{err}");
+}
+
+async fn inner_main_backup_demo(_spawner: Spawner) -> Result<Never> {
+    info!("Hello, back_up!");
+    let hardware: Hardware<'_> = Hardware::default();
+    let mut pio0 = hardware.pio0;
+    let state_machine_frequency = embassy_rp::clocks::clk_sys_freq();
+    let mut back_up_state_machine = pio0.sm0;
+    let buzzer_pio = pio0.common.make_pio_pin(hardware.buzzer);
+    back_up_state_machine.set_pin_dirs(Direction::Out, &[&buzzer_pio]);
+    back_up_state_machine.set_config(&{
+        let mut config = Config::default();
+        config.set_set_pins(&[&buzzer_pio]); // For set instruction
+        let program_with_defines = pio_file!("src/backup.pio");
+        let program = pio0.common.load_program(&program_with_defines.program);
+        config.use_program(&program, &[]);
+        config
+    });
+
+    back_up_state_machine.set_enable(true);
+    let half_period = state_machine_frequency / 1000 / 2;
+    let period_count = state_machine_frequency / (half_period * 2) / 2;
+    info!(
+        "Half period: {}, Period count: {}",
+        half_period, period_count
+    );
+    back_up_state_machine.tx().push(half_period);
+    back_up_state_machine.tx().push(period_count);
+    Timer::after(Duration::from_millis(5000)).await; // cmk
+    info!("Disabling back_up_state_machine");
+
+    back_up_state_machine.set_enable(false);
+
+    // run forever
+    loop {
+        Timer::after(Duration::from_secs(60 * 60 * 24)).await;
+    }
 }
 
 async fn inner_main(_spawner: Spawner) -> Result<Never> {

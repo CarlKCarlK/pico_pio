@@ -1,0 +1,34 @@
+.program backup
+
+; Read initial configuration
+    pull block         ; Read the half period of the beep sound
+    mov isr, osr      ; Store the half period in ISR
+    pull block        ; Read the period_count
+
+.wrap_target          ; Start of the main loop
+
+; Generate the beep sound
+    mov x, osr        ; Load period_count into X
+beep_loop:
+    set pins, 1       ; Set the buzzer to high voltage (start the tone)
+    mov y, isr        ; Load the half period into Y
+beep_high_delay:
+    jmp y--, beep_high_delay    ; Delay for the half period
+    
+    set pins, 0       ; Set the buzzer to low voltage (end the tone)
+    mov y, isr        ; Load the half period into Y
+beep_low_delay:
+    jmp y--, beep_low_delay     ; Delay for the low duration
+
+    jmp x--, beep_loop          ; Repeat the beep loop
+
+; Silence between beeps
+    mov x, osr        ; Load the period count into X for outer loop
+silence_loop:
+    mov y, isr        ; Load the half period into Y for inner loop
+silence_delay:
+    jmp y--, silence_delay [1]  ; Delay for two clock cycles (jmp + 1 extra)
+
+    jmp x--, silence_loop       ; Repeat the silence loop
+
+.wrap                 ; End of the main loop, jumps back to wrap_target

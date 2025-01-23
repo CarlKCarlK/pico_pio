@@ -22,7 +22,7 @@ def sound():
     jmp(x_dec, "low_voltage_loop")  # Delay
 
     # Read any new delay value. If none, keep the current delay.
-    mov(x, osr)  # set x, the default value for "pull(noblock)"
+    mov(x, osr)  # set X, the default value for "pull(noblock)"
     pull(noblock)  # Read a new delay value or use the default.
 
     # If the new delay is zero, rest. Otherwise, continue playing the tone.

@@ -1,18 +1,27 @@
 .program sound
-top:
-    pull block             ; Wait for an initial value from the FIFO
-    mov x, osr             ; Store the frequency in Y
-    jmp !x top         ; If x is zero, jump to "top"
-.wrap_target
-    mov y, x               ; Reload the delay into X
-    set pins, 1            ; Set the pin high
-high_loop:
-    jmp y-- high_loop      ; Delay
-    mov y, x               ; Reload the delay into X
-    set pins, 0            ; Set the pin low
-low_loop:
-    jmp y-- low_loop       ; Delay
-    pull noblock           ; The manual says if no value copies x into osr
-    mov x, osr
-    jmp !x top         ; If x is zero, jump to "top"
-.wrap
+
+;  Rest until a new tone is received.
+resting:
+    pull block           ; Wait for a new delay value
+    mov x, osr           ; Copy delay into X
+    jmp !x resting       ; If delay is zero, keep resting
+
+; Play the tone until a new delay is received.
+.wrap_target             ; Start of the main loop
+    set pins, 1          ; Set the buzzer high voltage.
+high_voltage_loop:
+    jmp x-- high_voltage_loop   ; Delay
+
+    set pins, 0          ; Set the buzzer low voltage.
+    mov x, osr           ; Load the half period into X.
+low_voltage_loop:
+    jmp x-- low_voltage_loop    ; Delay
+
+; Read any new delay value. If none, keep the current delay.
+    mov x, osr          ; set x, the default value for "pull(noblock)"
+    pull noblock        ; Read a new delay value or use the default.
+
+; If the new delay is zero, rest. Otherwise, continue playing the tone.    
+    mov x, osr          ; Copy the delay into X.
+    jmp !x resting      ; If X is zero, rest.
+.wrap ; Continue playing the sound.
