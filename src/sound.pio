@@ -1,0 +1,18 @@
+.program sound
+top:
+    pull block             ; Wait for an initial value from the FIFO
+    mov x, osr             ; Store the frequency in Y
+    jmp !x top         ; If x is zero, jump to "top"
+.wrap_target
+    mov y, x               ; Reload the delay into X
+    set pins, 1            ; Set the pin high
+high_loop:
+    jmp y-- high_loop      ; Delay
+    mov y, x               ; Reload the delay into X
+    set pins, 0            ; Set the pin low
+low_loop:
+    jmp y-- low_loop       ; Delay
+    pull noblock           ; The manual says if no value copies x into osr
+    mov x, osr
+    jmp !x top         ; If x is zero, jump to "top"
+.wrap

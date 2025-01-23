@@ -1,0 +1,7 @@
+{
+    "cSpell.words": [
+        "cooldown"
+    ],
+    "rust-analyzer.cargo.allTargets": false,
+    "rust-analyzer.cargo.target": "thumbv6m-none-eabi"
+}

@@ -21,14 +21,14 @@ def demo_distance():
     echo = Pin(ECHO_PIN, Pin.IN)
     # CM_PRECISION  = CM_PER_LOOP = (2 cycles per loop) * (34300 cm/s) / cycles_per_second / 2 (there and back)
     state_machine_frequency = int(2 * 34300.0 / CM_PRECISION / 2.0)
-distance_state_machine = rp2.StateMachine(
-    4,  # PIO Block 1, State machine 4
-    distance,  # PIO program
-    freq=state_machine_frequency,
-    in_base=echo,
-    set_base=Pin(TRIGGER_PIN, Pin.OUT),
-    jmp_pin=echo,
-)
+    distance_state_machine = rp2.StateMachine(
+        4,  # PIO Block 1, State machine 4
+        distance,  # PIO program
+        freq=state_machine_frequency,
+        in_base=echo,
+        set_base=Pin(TRIGGER_PIN, Pin.OUT),
+        jmp_pin=echo,
+    )
     max_loops = int(CM_MAX / CM_PRECISION)
     print(f"state_machine_frequency: {state_machine_frequency}, max_loops: {max_loops}")
 

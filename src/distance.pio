@@ -1,0 +1,42 @@
+.program distance
+.define ITER 25                    ; 25 iterations × 50 cycles = 1250 cycles = 10μs
+
+    ; cmk set x, 22                      ; cmk debug
+    ; cmk mov isr, x
+    ; cmk push
+
+    set x, 0
+sub_one:
+    jmp x-- sub_one          ; make x u32::max    
+    pull                    ; Pull the value from the TX FIFO into OSR
+
+.wrap_target
+    set pins, 1                    ; Begin 10μs trigger pulse
+
+    set y, ITER                    ; Setup 25 iterations
+high_loop:
+    nop [31]                       ; 32 cycles
+    jmp y-- high_loop [17]         ; 18 cycles (total 50 per iteration)
+    set pins, 0                    ; End trigger pulse
+
+    wait 1 pin 0                   ; Wait for echo to go high
+
+    mov y, osr                       ; Load 30ms timeout counter
+low_loop:
+    jmp pin no_echo                ; Jump while echo pin stays high
+    jmp reset                      ; Reset for next measurement
+no_echo:
+    jmp y-- low_loop               ; if timeout, reset else loop up
+reset:
+    jmp x!=y transmit
+    jmp cool_down
+transmit:
+    mov isr, y
+    push                           ; Push to FIFO (blocking)
+    mov x, y                       ; save y to x
+cool_down:    
+    ; wait 0 pin 0                   ; Wait for echo pin to return low cmk
+    mov y, osr                       ; Load 30ms cool down counter
+cool_loop:
+    jmp y-- cool_loop [8]          ; Wait before next measurement
+.wrap
