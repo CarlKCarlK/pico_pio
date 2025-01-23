@@ -7,6 +7,8 @@ name = "theremin"
 readme = "README.md"
 version = "0.1.0"
 
+[lib]
+
 [dependencies]
 defmt = "0.3.10"
 defmt-rtt = "0.4.1"
