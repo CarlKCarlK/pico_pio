@@ -1226,6 +1226,7 @@ dependencies = [
  "panic-probe",
  "pio",
  "pio-proc",
+ "typenum",
 ]
 
 [[package]]

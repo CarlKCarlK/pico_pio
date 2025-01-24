@@ -43,6 +43,7 @@ pio-proc = "0.2.2"
 pio = "0.2.1"
 fixed = "1.28.0"
 libm = "0.2.11"
+typenum = "1.17.0"
 
 [build-dependencies]
 pio-proc = "0.2.2"

@@ -14,7 +14,7 @@ CM_PRECISION = 0.1
 
 
 def demo_distance():
-    print("Hello, distance2")
+    print("Hello, distance!cmk")
 
     pio1 = rp2.PIO(1)
     pio1.remove_program()

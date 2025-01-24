@@ -1,42 +1,43 @@
 .program distance
-.define ITER 25                    ; 25 iterations × 50 cycles = 1250 cycles = 10μs
 
-    ; cmk set x, 22                      ; cmk debug
-    ; cmk mov isr, x
-    ; cmk push
-
+; X is the last value sent. Initialize it to
+; u32::MAX which means 'echo timeout'
+; (Set X to u32::MAX by subtracting 1 from 0)
     set x, 0
-sub_one:
-    jmp x-- sub_one          ; make x u32::max    
-    pull                    ; Pull the value from the TX FIFO into OSR
+subtraction_trick:
+    jmp x-- subtraction_trick
 
+; Read the max echo wait into OSR
+    pull                         ; same as pull block
+
+; Main loop
 .wrap_target
-    set pins, 1                    ; Begin 10μs trigger pulse
+    ; Generate 10μs trigger pulse (35 cycles at 343_000Hz)
+    set pins, 0b1 [2]       ; Set trigger pin to high, add delay of 3
+    set pins, 0b0           ; Set trigger pin to low voltage
 
-    set y, ITER                    ; Setup 25 iterations
-high_loop:
-    nop [31]                       ; 32 cycles
-    jmp y-- high_loop [17]         ; 18 cycles (total 50 per iteration)
-    set pins, 0                    ; End trigger pulse
+    ; When the trigger goes high, start counting down until it goes low
+    wait 1 pin 0            ; Wait for echo pin to be high voltage
+    mov y, osr              ; Load max echo wait into Y
 
-    wait 1 pin 0                   ; Wait for echo to go high
+measure_echo_loop:
+    jmp pin echo_active     ; if echo voltage is high continue count down
+    jmp measurement_complete ; if echo voltage is low, measurement is complete
+echo_active:
+    jmp y-- measure_echo_loop ; Continue counting down unless timeout
 
-    mov y, osr                       ; Load 30ms timeout counter
-low_loop:
-    jmp pin no_echo                ; Jump while echo pin stays high
-    jmp reset                      ; Reset for next measurement
-no_echo:
-    jmp y-- low_loop               ; if timeout, reset else loop up
-reset:
-    jmp x!=y transmit
-    jmp cool_down
-transmit:
-    mov isr, y
-    push                           ; Push to FIFO (blocking)
-    mov x, y                       ; save y to x
-cool_down:    
-    ; wait 0 pin 0                   ; Wait for echo pin to return low cmk
-    mov y, osr                       ; Load 30ms cool down counter
-cool_loop:
-    jmp y-- cool_loop [8]          ; Wait before next measurement
-.wrap
+; Y tells where the echo countdown stopped. It
+; will be u32::MAX if the echo timed out.
+measurement_complete:
+    jmp x!=y send_result    ; if measurement is different, then sent it.
+    jmp cooldown            ; If measurement is the same, don't send.
+
+send_result:
+    mov isr, y              ; Store measurement in ISR
+    push                    ; Output ISR
+    mov x, y               ; Save the measurement in X
+
+; Cool down period before next measurement
+cooldown:
+    wait 0 pin 0           ; Wait for echo pin to be low
+.wrap                      ; Restart the measurement loop
