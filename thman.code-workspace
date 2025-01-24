@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "serial:/COM6",
+			"uri": "serial://com6/"
+		}
+	],
+	"settings": {
+		"rust-analyzer.cargo.allTargets": false,
+		"rust-analyzer.cargo.target": "thumbv6m-none-eabi"
+	}
+}
