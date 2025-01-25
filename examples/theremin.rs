@@ -76,8 +76,10 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
     distance_state_machine.tx().push(max_loops);
     loop {
         let end_loops = distance_state_machine.rx().wait_pull().await;
+        info!("End loops: {}", end_loops);
         match loop_difference_to_distance_cm(max_loops, end_loops) {
             None => {
+                info!("Distance: out of range");
                 sound_state_machine.tx().push(0);
             }
             Some(distance_cm) => {
@@ -91,14 +93,14 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
 }
 
 #[inline]
-fn loop_difference_to_distance_cm(max_loops: u32, end_loops: u32) -> Option<u32> {
+fn loop_difference_to_distance_cm(max_loops: u32, end_loops: u32) -> Option<f32> {
     if end_loops == u32::MAX {
         return None;
     }
-    Some((max_loops - end_loops) / CM_UNITS_PER_CM)
+    Some((max_loops - end_loops) as f32 / CM_UNITS_PER_CM as f32)
 }
 
 #[inline]
-fn distance_to_tone_frequency(distance: u32) -> f32 {
-    LOWEST_TONE_FREQUENCY * powf(2.0, distance as f32 * OCTAVE_COUNT / CM_MAX as f32)
+fn distance_to_tone_frequency(distance: f32) -> f32 {
+    LOWEST_TONE_FREQUENCY * powf(2.0, distance * OCTAVE_COUNT / CM_MAX as f32)
 }
