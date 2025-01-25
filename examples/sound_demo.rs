@@ -62,12 +62,12 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
             let half_period = state_machine_frequency / frequency / 2;
             info!("{} -- Frequency: {}", lyrics, frequency);
             // Send the half period to the PIO state machine
-            sound_state_machine.tx().push(half_period);
+            sound_state_machine.tx().wait_push(half_period).await;
             Timer::after(Duration::from_millis(*ms)).await; // Wait as the tone plays
-            sound_state_machine.tx().push(0); // Stop the tone
+            sound_state_machine.tx().wait_push(0).await; // Stop the tone
             Timer::after(Duration::from_millis(50)).await; // Give a short pause between notes
         } else {
-            sound_state_machine.tx().push(0); // Play a silent rust
+            sound_state_machine.tx().wait_push(0).await; // Play a silent rust
             Timer::after(Duration::from_millis(*ms + 50)).await; // Wait for the rest duration + a short pause
         }
     }

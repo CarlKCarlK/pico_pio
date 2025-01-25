@@ -5,6 +5,7 @@ use defmt::info;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_rp::pio::{Config, Direction};
+use embassy_time::{Duration, Timer};
 use fixed::FixedU32;
 use libm::powf;
 use panic_probe as _;
@@ -22,16 +23,19 @@ async fn main(spawner: Spawner) -> ! {
 
 const CM_MAX: u32 = 50;
 const CM_UNITS_PER_CM: u32 = 10;
+const MAX_LOOPS: u32 = CM_MAX * CM_UNITS_PER_CM;
+
 const LOWEST_TONE_FREQUENCY: f32 = 123.47; // B2
 const OCTAVE_COUNT: f32 = 2.5; //  to F5
 
 async fn inner_main(_spawner: Spawner) -> Result<Never> {
     info!("Hello, theremin!");
     let hardware: Hardware<'_> = Hardware::default();
+    let system_frequency = embassy_rp::clocks::clk_sys_freq();
 
     // Set up the sound state machine
     let mut pio0 = hardware.pio0;
-    let sound_state_machine_frequency = embassy_rp::clocks::clk_sys_freq();
+    let sound_state_machine_frequency = system_frequency;
     let mut sound_state_machine = pio0.sm0;
     let buzzer_pio = pio0.common.make_pio_pin(hardware.buzzer);
     sound_state_machine.set_pin_dirs(Direction::Out, &[&buzzer_pio]);
@@ -46,7 +50,6 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
 
     // Set up the distance state machine
     let mut pio1 = hardware.pio1;
-    let system_frequency = embassy_rp::clocks::clk_sys_freq();
     let distance_state_machine_frequency = 2 * 34_300 * CM_UNITS_PER_CM / 2;
     let mut distance_state_machine = pio1.sm0;
     let trigger_pio = pio1.common.make_pio_pin(hardware.trigger);
@@ -69,35 +72,35 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
         info!("clock_divider: {}", config.clock_divider.to_num::<f32>());
         config
     });
-    let max_loops = CM_MAX * CM_UNITS_PER_CM;
 
     sound_state_machine.set_enable(true);
     distance_state_machine.set_enable(true);
-    distance_state_machine.tx().push(max_loops);
+    distance_state_machine.tx().wait_push(MAX_LOOPS).await;
     loop {
         let end_loops = distance_state_machine.rx().wait_pull().await;
         info!("End loops: {}", end_loops);
-        match loop_difference_to_distance_cm(max_loops, end_loops) {
+        match loop_difference_to_distance_cm(end_loops) {
             None => {
                 info!("Distance: out of range");
-                sound_state_machine.tx().push(0);
+                sound_state_machine.tx().wait_push(0).await;
             }
             Some(distance_cm) => {
                 let tone_frequency = distance_to_tone_frequency(distance_cm);
-                info!("Distance: {} cm, tone: {} Hz", distance_cm, tone_frequency);
                 let half_period = sound_state_machine_frequency / tone_frequency as u32 / 2;
-                sound_state_machine.tx().push(half_period);
+                info!("Distance: {} cm, tone: {} Hz", distance_cm, tone_frequency);
+                sound_state_machine.tx().push(half_period); // non-blocking push
+                Timer::after(Duration::from_millis(100)).await;
             }
         }
     }
 }
 
 #[inline]
-fn loop_difference_to_distance_cm(max_loops: u32, end_loops: u32) -> Option<f32> {
+fn loop_difference_to_distance_cm(end_loops: u32) -> Option<f32> {
     if end_loops == u32::MAX {
         return None;
     }
-    Some((max_loops - end_loops) as f32 / CM_UNITS_PER_CM as f32)
+    Some((MAX_LOOPS - end_loops) as f32 / CM_UNITS_PER_CM as f32)
 }
 
 #[inline]

@@ -42,8 +42,8 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
         "Half period: {}, Period count: {}",
         half_period, period_count
     );
-    back_up_state_machine.tx().push(half_period);
-    back_up_state_machine.tx().push(period_count);
+    back_up_state_machine.tx().wait_push(half_period).await;
+    back_up_state_machine.tx().wait_push(period_count).await;
     Timer::after(Duration::from_millis(5000)).await;
     info!("Disabling back_up_state_machine");
 

@@ -5,13 +5,12 @@ use defmt::info;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_rp::pio::{Config, Direction};
-use embassy_time::{Duration, Timer};
 use fixed::FixedU32;
 use panic_probe as _;
 use pio_proc::pio_file;
+use typenum::U8;
 
 use theremin::{Hardware, Never, Result};
-use typenum::U8;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
@@ -22,6 +21,7 @@ async fn main(spawner: Spawner) -> ! {
 
 const CM_MAX: u32 = 50;
 const CM_UNITS_PER_CM: u32 = 10;
+const MAX_LOOPS: u32 = CM_MAX * CM_UNITS_PER_CM;
 
 async fn inner_main(_spawner: Spawner) -> Result<Never> {
     info!("Hello, distance!");
@@ -49,28 +49,27 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
         info!("clock_divider: {}", config.clock_divider.to_num::<f32>());
         config
     });
-    let max_loops = CM_MAX * CM_UNITS_PER_CM;
     info!(
         "state_machine_frequency: {}, max_loops: {}",
-        state_machine_frequency, max_loops
+        state_machine_frequency, MAX_LOOPS
     );
 
     let ten_μs = (state_machine_frequency * 10).div_ceil(1_000_000);
     info!("10 microsecond trigger pulse is {} cycles", ten_μs);
 
     distance_state_machine.set_enable(true);
-    distance_state_machine.tx().push(max_loops);
+    distance_state_machine.tx().wait_push(MAX_LOOPS).await;
     loop {
         let end_loops = distance_state_machine.rx().wait_pull().await;
-        let distance_cm = loop_difference_to_distance_cm(max_loops, end_loops);
+        let distance_cm = loop_difference_to_distance_cm(MAX_LOOPS, end_loops);
         info!("Distance: {} cm, end_loops: {}", distance_cm, end_loops);
     }
 }
 
 #[inline]
-fn loop_difference_to_distance_cm(max_loops: u32, end_loops: u32) -> Option<u32> {
+fn loop_difference_to_distance_cm(max_loops: u32, end_loops: u32) -> Option<f32> {
     if end_loops == u32::MAX {
         return None;
     }
-    Some((max_loops - end_loops) / CM_UNITS_PER_CM)
+    Some((max_loops - end_loops) as f32 / CM_UNITS_PER_CM as f32)
 }
