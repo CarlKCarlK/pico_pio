@@ -5,13 +5,13 @@ use defmt::info;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_rp::pio::{Config, Direction};
-use embassy_time::{Duration, Timer};
 use fixed::FixedU32;
+use libm::powf;
 use panic_probe as _;
 use pio_proc::pio_file;
+use typenum::U8;
 
 use theremin::{Hardware, Never, Result};
-use typenum::U8;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
@@ -22,13 +22,32 @@ async fn main(spawner: Spawner) -> ! {
 
 const CM_MAX: u32 = 50;
 const CM_UNITS_PER_CM: u32 = 10;
+const LOWEST_TONE_FREQUENCY: f32 = 123.47; // B2
+const OCTAVE_COUNT: f32 = 2.5; //  to F5
 
 async fn inner_main(_spawner: Spawner) -> Result<Never> {
-    info!("Hello, distance!");
+    info!("Hello, theremin!");
     let hardware: Hardware<'_> = Hardware::default();
+
+    // Set up the sound state machine
+    let mut pio0 = hardware.pio0;
+    let sound_state_machine_frequency = embassy_rp::clocks::clk_sys_freq();
+    let mut sound_state_machine = pio0.sm0;
+    let buzzer_pio = pio0.common.make_pio_pin(hardware.buzzer);
+    sound_state_machine.set_pin_dirs(Direction::Out, &[&buzzer_pio]);
+    sound_state_machine.set_config(&{
+        let mut config = Config::default();
+        config.set_set_pins(&[&buzzer_pio]); // For set instruction
+        let program_with_defines = pio_file!("examples/sound.pio");
+        let program = pio0.common.load_program(&program_with_defines.program);
+        config.use_program(&program, &[]);
+        config
+    });
+
+    // Set up the distance state machine
     let mut pio1 = hardware.pio1;
     let system_frequency = embassy_rp::clocks::clk_sys_freq();
-    let state_machine_frequency = 2 * 34_300 * CM_UNITS_PER_CM / 2;
+    let distance_state_machine_frequency = 2 * 34_300 * CM_UNITS_PER_CM / 2;
     let mut distance_state_machine = pio1.sm0;
     let trigger_pio = pio1.common.make_pio_pin(hardware.trigger);
     let echo_pio = pio1.common.make_pio_pin(hardware.echo);
@@ -44,26 +63,30 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
         let program = pio1.common.load_program(&program_with_defines.program);
         config.use_program(&program, &[]);
         // Set the clock divider for the desired state machine frequency
-        config.clock_divider =
-            FixedU32::<U8>::from_num(system_frequency as f32 / state_machine_frequency as f32);
+        config.clock_divider = FixedU32::<U8>::from_num(
+            system_frequency as f32 / distance_state_machine_frequency as f32,
+        );
         info!("clock_divider: {}", config.clock_divider.to_num::<f32>());
         config
     });
     let max_loops = CM_MAX * CM_UNITS_PER_CM;
-    info!(
-        "state_machine_frequency: {}, max_loops: {}",
-        state_machine_frequency, max_loops
-    );
 
-    let ten_μs = (state_machine_frequency * 10).div_ceil(1_000_000);
-    info!("10 microsecond trigger pulse is {} cycles", ten_μs);
-
+    sound_state_machine.set_enable(true);
     distance_state_machine.set_enable(true);
     distance_state_machine.tx().push(max_loops);
     loop {
         let end_loops = distance_state_machine.rx().wait_pull().await;
-        let distance_cm = loop_difference_to_distance_cm(max_loops, end_loops);
-        info!("Distance: {} cm, end_loops: {}", distance_cm, end_loops);
+        match loop_difference_to_distance_cm(max_loops, end_loops) {
+            None => {
+                sound_state_machine.tx().push(0);
+            }
+            Some(distance_cm) => {
+                let tone_frequency = distance_to_tone_frequency(distance_cm);
+                info!("Distance: {} cm, tone: {} Hz", distance_cm, tone_frequency);
+                let half_period = sound_state_machine_frequency / tone_frequency as u32 / 2;
+                sound_state_machine.tx().push(half_period);
+            }
+        }
     }
 }
 
@@ -73,4 +96,9 @@ fn loop_difference_to_distance_cm(max_loops: u32, end_loops: u32) -> Option<u32>
         return None;
     }
     Some((max_loops - end_loops) / CM_UNITS_PER_CM)
+}
+
+#[inline]
+fn distance_to_tone_frequency(distance: u32) -> f32 {
+    LOWEST_TONE_FREQUENCY * powf(2.0, distance as f32 * OCTAVE_COUNT / CM_MAX as f32)
 }

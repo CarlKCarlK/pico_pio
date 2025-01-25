@@ -1,28 +1,14 @@
 #![no_std]
 
-use defmt::info;
 use defmt_rtt as _;
 use derive_more::derive::{Display, Error, From};
-use embassy_executor::Spawner;
 use embassy_rp::{
     bind_interrupts,
     config::Config as Rp_Config,
     peripherals::{PIN_15, PIN_16, PIN_17, PIO0, PIO1},
-    pio::{Config, Direction, InterruptHandler, Pio},
+    pio::{InterruptHandler, Pio},
 };
-use embassy_time::{Duration, Timer};
-use libm::powf;
 use panic_probe as _;
-use pio_proc::pio_file;
-
-const F_LOW: f32 = 123.47; // Precomputed lower frequency (~123.47 Hz)
-const N_OCTAVES: f32 = 2.5; // Total number of octaves
-const D_MAX: f32 = 100.0; // Maximum distance in cm
-
-#[inline]
-fn distance_to_frequency(distance: f32) -> f32 {
-    F_LOW * powf(2.0, (distance / D_MAX) * N_OCTAVES)
-}
 
 /// Rust's `!` is unstable.  This is a locally-defined equivalent which is stable.
 #[derive(Debug)]

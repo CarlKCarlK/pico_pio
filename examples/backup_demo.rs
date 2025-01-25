@@ -44,13 +44,13 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
     );
     back_up_state_machine.tx().push(half_period);
     back_up_state_machine.tx().push(period_count);
-    Timer::after(Duration::from_millis(5000)).await; // cmk
+    Timer::after(Duration::from_millis(5000)).await;
     info!("Disabling back_up_state_machine");
 
     back_up_state_machine.set_enable(false);
 
     // run forever
     loop {
-        Timer::after(Duration::from_secs(60 * 60 * 24)).await;
+        Timer::after(Duration::from_secs(3_153_600_000)).await; // 100 years
     }
 }

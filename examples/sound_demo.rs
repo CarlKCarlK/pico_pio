@@ -76,6 +76,6 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
 
     // run forever
     loop {
-        Timer::after(Duration::from_secs(60 * 60 * 24)).await;
+        Timer::after(Duration::from_secs(3_153_600_000)).await; // 100 years
     }
 }
