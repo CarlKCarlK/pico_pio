@@ -12,8 +12,8 @@ subtraction_trick:
 
 ; Main loop
 .wrap_target
-    ; Generate 10μs trigger pulse (cmk cycles at 343_000Hz)
-    set pins, 1 [3]       ; Set trigger pin to high, add delay of cmk
+    ; Generate 10μs trigger pulse (4 cycles at 343_000Hz)
+    set pins, 1 [3]       ; Set trigger pin to high, add delay of 3
     set pins, 0           ; Set trigger pin to low voltage
 
     ; When the trigger goes high, start counting down until it goes low
