@@ -6,4 +6,4 @@
 * `cargo run --example sound_demo`
 * `cargo run --example distance_demo`
 * `cargo run --example distance_debug`
-* `cargo run --example theremin_demo`
+* `cargo run --example theremin`

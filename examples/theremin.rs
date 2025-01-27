@@ -78,7 +78,6 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
     distance_state_machine.tx().wait_push(MAX_LOOPS).await;
     loop {
         let end_loops = distance_state_machine.rx().wait_pull().await;
-        info!("End loops: {}", end_loops);
         match loop_difference_to_distance_cm(end_loops) {
             None => {
                 info!("Distance: out of range");
@@ -89,7 +88,7 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
                 let half_period = sound_state_machine_frequency / tone_frequency as u32 / 2;
                 info!("Distance: {} cm, tone: {} Hz", distance_cm, tone_frequency);
                 sound_state_machine.tx().push(half_period); // non-blocking push
-                Timer::after(Duration::from_millis(100)).await;
+                Timer::after(Duration::from_millis(50)).await;
             }
         }
     }
