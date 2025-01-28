@@ -7,3 +7,4 @@
 * `cargo run --example distance_demo`
 * `cargo run --example distance_debug`
 * `cargo run --example theremin`
+* `cargo run --example theremin_no_pio --release`
