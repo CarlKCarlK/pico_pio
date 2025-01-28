@@ -31,7 +31,7 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
         config.set_set_pins(&[&buzzer_pio]); // For set instruction
         let program_with_defines = pio_file!("examples/backup.pio");
         let program = pio0.common.load_program(&program_with_defines.program);
-        config.use_program(&program, &[]);
+        config.use_program(&program, &[]); // No side-set pins
         config
     });
 

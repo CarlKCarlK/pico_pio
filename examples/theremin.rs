@@ -44,7 +44,7 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
         config.set_set_pins(&[&buzzer_pio]); // For set instruction
         let program_with_defines = pio_file!("examples/sound.pio");
         let program = pio0.common.load_program(&program_with_defines.program);
-        config.use_program(&program, &[]);
+        config.use_program(&program, &[]); // No side-set pins
         config
     });
 
@@ -64,8 +64,8 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
         config.set_jmp_pin(&echo_pio); // For jmp instruction
         let program_with_defines = pio_file!("examples/distance.pio");
         let program = pio1.common.load_program(&program_with_defines.program);
-        config.use_program(&program, &[]);
-        // Set the clock divider for the desired state machine frequency
+        config.use_program(&program, &[]); // No side-set pins
+                                           // Set the clock divider for the desired state machine frequency
         config.clock_divider = FixedU32::<U8>::from_num(
             system_frequency as f32 / distance_state_machine_frequency as f32,
         );

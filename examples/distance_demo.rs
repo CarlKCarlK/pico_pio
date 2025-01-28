@@ -29,10 +29,10 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
     let mut pio1 = hardware.pio1;
     let system_frequency = embassy_rp::clocks::clk_sys_freq();
     let state_machine_frequency = 2 * 34_300 * CM_UNITS_PER_CM / 2;
+
     let mut distance_state_machine = pio1.sm0;
     let trigger_pio = pio1.common.make_pio_pin(hardware.trigger);
     let echo_pio = pio1.common.make_pio_pin(hardware.echo);
-
     distance_state_machine.set_pin_dirs(Direction::Out, &[&trigger_pio]);
     distance_state_machine.set_pin_dirs(Direction::In, &[&echo_pio]);
     distance_state_machine.set_config(&{
@@ -42,7 +42,8 @@ async fn inner_main(_spawner: Spawner) -> Result<Never> {
         config.set_jmp_pin(&echo_pio); // For jmp instruction
         let program_with_defines = pio_file!("examples/distance.pio");
         let program = pio1.common.load_program(&program_with_defines.program);
-        config.use_program(&program, &[]);
+        config.use_program(&program, &[]); // No side-set pins
+
         // Set the clock divider for the desired state machine frequency
         config.clock_divider =
             FixedU32::<U8>::from_num(system_frequency as f32 / state_machine_frequency as f32);
