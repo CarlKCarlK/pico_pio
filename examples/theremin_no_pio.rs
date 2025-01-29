@@ -12,6 +12,7 @@ use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, signal::Signal,
 };
 use embassy_time::{Duration, Instant, Timer};
+use libm::powf;
 use panic_probe as _;
 use theremin::{Hardware, Never, Result};
 
@@ -26,20 +27,39 @@ async fn inner_main(spawner: Spawner) -> Result<Never> {
     info!("Hello, theremin no PIO!");
     let hardware: Hardware<'_> = Hardware::default();
 
-    static DISTANCE_NOTIFIER: DistanceNotifier = Distance::notifier();
+    let buzzer_pin = gpio::Output::new(hardware.buzzer, gpio::Level::Low);
     let trigger_pin = gpio::Output::new(hardware.trigger, gpio::Level::Low);
     let echo_pin = gpio::Input::new(hardware.echo, gpio::Pull::Down);
+    static SOUND_NOTIFIER: SoundNotifier = Sound::notifier();
+    let sound = Sound::new(buzzer_pin, &SOUND_NOTIFIER, spawner)?;
+    static DISTANCE_NOTIFIER: DistanceNotifier = Distance::notifier();
     let distance = Distance::new(trigger_pin, echo_pin, &DISTANCE_NOTIFIER, spawner)?;
-    info!("Distance created");
+
     loop {
-        let distance = distance.measure().await;
-        if let Some(distance) = distance {
-            info!("Distance: {} cm", distance);
-        } else {
-            info!("Distance: Too far");
+        match distance.measure().await {
+            None => {
+                info!("Distance: out of range");
+                sound.rest().await;
+            }
+            Some(distance_cm) => {
+                let tone_frequency = distance_to_tone_frequency(distance_cm);
+                info!("Distance: {} cm, tone: {} Hz", distance_cm, tone_frequency);
+                sound.play(NonZeroU16::new(tone_frequency).unwrap()).await;
+                Timer::after(Duration::from_millis(50)).await;
+            }
         }
-        // Timer::after(Duration::from_millis(100)).await;
     }
+
+    // info!("Distance created");
+    // loop {
+    //     let distance = distance.measure().await;
+    //     if let Some(distance) = distance {
+    //         info!("Distance: {} cm", distance);
+    //     } else {
+    //         info!("Distance: Too far");
+    //     }
+    //     // Timer::after(Duration::from_millis(100)).await;
+    // }
 
     // static SOUND_NOTIFIER: SoundNotifier = Sound::notifier();
     // let buzzer_pin = gpio::Output::new(hardware.buzzer, gpio::Level::Low);
@@ -136,27 +156,6 @@ async fn inner_device_loop_sound(
     }
 }
 
-const TWINKLE_TWINKLE: [(u16, u64, &str); 16] = [
-    // Bar 1
-    (262, 400, "Twin-"), // C
-    (262, 400, "-kle"),  // C
-    (392, 400, "twin-"), // G
-    (392, 400, "-kle"),  // G
-    (440, 400, "lit-"),  // A
-    (440, 400, "-tle"),  // A
-    (392, 800, "star"),  // G
-    (0, 400, ""),        // rest
-    // Bar 2
-    (349, 400, "How"),  // F
-    (349, 400, "I"),    // F
-    (330, 400, "won-"), // E
-    (330, 400, "-der"), // E
-    (294, 400, "what"), // D
-    (294, 400, "you"),  // D
-    (262, 800, "are"),  // C
-    (0, 400, ""),       // rest
-];
-
 pub struct Distance<'a>(&'a DistanceNotifier);
 pub type DistanceNotifier = Signal<CriticalSectionRawMutex, Option<f32>>;
 impl Distance<'_> {
@@ -195,6 +194,8 @@ async fn device_loop_distance(
 const CM_MAX: f32 = 50.0;
 const CM_RESOLUTION: f32 = 0.1;
 const CM_PER_SECOND: f32 = 34300.0; // speed of sound in cm/s
+const LOWEST_TONE_FREQUENCY: f32 = 123.47; // B2
+const OCTAVE_COUNT: f32 = 2.5; //  to F5
 
 async fn inner_device_loop_distance(
     mut trigger_pin: gpio::Output<'static>,
@@ -204,7 +205,6 @@ async fn inner_device_loop_distance(
     // wait 2ms to settle
     Timer::after(Duration::from_micros(2_000)).await;
 
-    const CM_PER_SECOND: f32 = 34300.0; // speed of sound in cm/s
     let max_duration = Duration::from_micros((1_000_000.0 * CM_MAX * 2.0 / CM_PER_SECOND) as u64);
     let mut previous_measure: Option<f32> = None;
     loop {
@@ -233,4 +233,9 @@ async fn inner_device_loop_distance(
         }
         Timer::after(Duration::from_millis(60)).await;
     }
+}
+
+#[inline]
+fn distance_to_tone_frequency(distance: f32) -> u16 {
+    (LOWEST_TONE_FREQUENCY * powf(2.0, distance * OCTAVE_COUNT / CM_MAX)) as u16
 }
