@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use core::num::NonZeroU16;
-
 use defmt::info;
 use defmt_rtt as _;
 use embassy_executor::{SpawnError, Spawner};
@@ -15,6 +13,12 @@ use embassy_time::{Duration, Instant, Timer};
 use libm::powf;
 use panic_probe as _;
 use theremin::{Hardware, Never, Result};
+
+const CM_MAX: f32 = 50.0;
+const CM_RESOLUTION: f32 = 0.1;
+const CM_PER_SECOND: f32 = 34300.0; // speed of sound in cm/s
+const LOWEST_TONE_FREQUENCY: f32 = 123.47; // B2
+const OCTAVE_COUNT: f32 = 2.5; //  to F5
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
@@ -44,49 +48,15 @@ async fn inner_main(spawner: Spawner) -> Result<Never> {
             Some(distance_cm) => {
                 let tone_frequency = distance_to_tone_frequency(distance_cm);
                 info!("Distance: {} cm, tone: {} Hz", distance_cm, tone_frequency);
-                sound.play(NonZeroU16::new(tone_frequency).unwrap()).await;
+                sound.play(tone_frequency).await;
                 Timer::after(Duration::from_millis(50)).await;
             }
         }
     }
-
-    // info!("Distance created");
-    // loop {
-    //     let distance = distance.measure().await;
-    //     if let Some(distance) = distance {
-    //         info!("Distance: {} cm", distance);
-    //     } else {
-    //         info!("Distance: Too far");
-    //     }
-    //     // Timer::after(Duration::from_millis(100)).await;
-    // }
-
-    // static SOUND_NOTIFIER: SoundNotifier = Sound::notifier();
-    // let buzzer_pin = gpio::Output::new(hardware.buzzer, gpio::Level::Low);
-    // let sound = Sound::new(buzzer_pin, &SOUND_NOTIFIER, spawner)?;
-    // info!("Sound created");
-    // for (frequency, ms, lyrics) in TWINKLE_TWINKLE.iter() {
-    //     if *frequency > 0 {
-    //         info!("{} -- Frequency: {}", lyrics, frequency);
-    //         sound.play(NonZeroU16::new(*frequency).unwrap()).await;
-    //         Timer::after(Duration::from_millis(*ms)).await; // Wait as the tone plays
-    //         sound.rest().await;
-    //         Timer::after(Duration::from_millis(50)).await; // Give a short pause between notes
-    //     } else {
-    //         sound.rest().await;
-    //         Timer::after(Duration::from_millis(*ms + 50)).await; // Wait for the rest duration + a short pause
-    //     }
-    // }
-    // sound.rest().await;
-
-    // // run forever
-    // loop {
-    //     Timer::after(Duration::from_secs(3_153_600_000)).await; // 100 years
-    // }
 }
 
 pub struct Sound<'a>(&'a SoundNotifier);
-pub type SoundNotifier = Channel<CriticalSectionRawMutex, Option<NonZeroU16>, 4>;
+pub type SoundNotifier = Channel<CriticalSectionRawMutex, Option<u16>, 4>;
 impl Sound<'_> {
     #[must_use]
     pub const fn notifier() -> SoundNotifier {
@@ -103,7 +73,7 @@ impl Sound<'_> {
         Ok(Self(notifier))
     }
 
-    pub async fn play(&self, frequency: NonZeroU16) {
+    pub async fn play(&self, frequency: u16) {
         self.0.send(Some(frequency)).await;
     }
 
@@ -126,7 +96,7 @@ async fn inner_device_loop_sound(
     mut buzzer_pin: gpio::Output<'static>,
     notifier: &'static SoundNotifier,
 ) -> Result<Never> {
-    let mut notification: Option<NonZeroU16> = None;
+    let mut notification: Option<u16> = None;
     loop {
         match notification {
             None => {
@@ -134,7 +104,7 @@ async fn inner_device_loop_sound(
                 notification = notifier.receive().await;
             }
             Some(frequency) => {
-                let half_duration = Duration::from_micros(1_000_000 / (frequency.get() as u64 * 2));
+                let half_duration = Duration::from_micros(1_000_000 / (frequency as u64 * 2));
                 loop {
                     buzzer_pin.set_high();
                     if let Either::Second(inner_notification) =
@@ -191,12 +161,6 @@ async fn device_loop_distance(
     panic!("{:?}", err);
 }
 
-const CM_MAX: f32 = 50.0;
-const CM_RESOLUTION: f32 = 0.1;
-const CM_PER_SECOND: f32 = 34300.0; // speed of sound in cm/s
-const LOWEST_TONE_FREQUENCY: f32 = 123.47; // B2
-const OCTAVE_COUNT: f32 = 2.5; //  to F5
-
 async fn inner_device_loop_distance(
     mut trigger_pin: gpio::Output<'static>,
     mut echo_pin: gpio::Input<'static>,
@@ -217,13 +181,9 @@ async fn inner_device_loop_distance(
             Either::First(_) => None,
             Either::Second(_) => {
                 let duration = Instant::now() - start;
-                Some(
-                    (duration.as_micros() as f32 * CM_PER_SECOND
-                        / 2.0
-                        / 1_000_000.0
-                        / CM_RESOLUTION) as u32 as f32
-                        * CM_RESOLUTION,
-                )
+                Some(round(
+                    duration.as_micros() as f32 * CM_PER_SECOND / 2.0 / 1_000_000.0,
+                ))
             }
         };
         // round measure to CM_RESOLUTION
@@ -238,4 +198,9 @@ async fn inner_device_loop_distance(
 #[inline]
 fn distance_to_tone_frequency(distance: f32) -> u16 {
     (LOWEST_TONE_FREQUENCY * powf(2.0, distance * OCTAVE_COUNT / CM_MAX)) as u16
+}
+
+#[inline]
+fn round(distance: f32) -> f32 {
+    (distance / CM_RESOLUTION) as u32 as f32 * CM_RESOLUTION
 }
