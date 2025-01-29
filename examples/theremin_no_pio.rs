@@ -8,10 +8,11 @@ use defmt_rtt as _;
 use embassy_executor::{SpawnError, Spawner};
 use embassy_futures::select::{select, Either};
 use embassy_rp::gpio;
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
-use embassy_time::{Duration, Timer};
+use embassy_sync::{
+    blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, signal::Signal,
+};
+use embassy_time::{Duration, Instant, Timer};
 use panic_probe as _;
-
 use theremin::{Hardware, Never, Result};
 
 #[embassy_executor::main]
@@ -25,28 +26,43 @@ async fn inner_main(spawner: Spawner) -> Result<Never> {
     info!("Hello, theremin no PIO!");
     let hardware: Hardware<'_> = Hardware::default();
 
-    static SOUND_NOTIFIER: SoundNotifier = Sound::notifier();
-    let buzzer_pin = gpio::Output::new(hardware.buzzer, gpio::Level::Low);
-    let sound = Sound::new(buzzer_pin, &SOUND_NOTIFIER, spawner)?;
-    info!("Sound created");
-    for (frequency, ms, lyrics) in TWINKLE_TWINKLE.iter() {
-        if *frequency > 0 {
-            info!("{} -- Frequency: {}", lyrics, frequency);
-            sound.play(NonZeroU16::new(*frequency).unwrap()).await;
-            Timer::after(Duration::from_millis(*ms)).await; // Wait as the tone plays
-            sound.rest().await;
-            Timer::after(Duration::from_millis(50)).await; // Give a short pause between notes
-        } else {
-            sound.rest().await;
-            Timer::after(Duration::from_millis(*ms + 50)).await; // Wait for the rest duration + a short pause
-        }
-    }
-    sound.rest().await;
-
-    // run forever
+    static DISTANCE_NOTIFIER: DistanceNotifier = Distance::notifier();
+    let trigger_pin = gpio::Output::new(hardware.trigger, gpio::Level::Low);
+    let echo_pin = gpio::Input::new(hardware.echo, gpio::Pull::Down);
+    let distance = Distance::new(trigger_pin, echo_pin, &DISTANCE_NOTIFIER, spawner)?;
+    info!("Distance created");
     loop {
-        Timer::after(Duration::from_secs(3_153_600_000)).await; // 100 years
+        let distance = distance.measure().await;
+        if let Some(distance) = distance {
+            info!("Distance: {} cm", distance);
+        } else {
+            info!("Distance: Too far");
+        }
+        // Timer::after(Duration::from_millis(100)).await;
     }
+
+    // static SOUND_NOTIFIER: SoundNotifier = Sound::notifier();
+    // let buzzer_pin = gpio::Output::new(hardware.buzzer, gpio::Level::Low);
+    // let sound = Sound::new(buzzer_pin, &SOUND_NOTIFIER, spawner)?;
+    // info!("Sound created");
+    // for (frequency, ms, lyrics) in TWINKLE_TWINKLE.iter() {
+    //     if *frequency > 0 {
+    //         info!("{} -- Frequency: {}", lyrics, frequency);
+    //         sound.play(NonZeroU16::new(*frequency).unwrap()).await;
+    //         Timer::after(Duration::from_millis(*ms)).await; // Wait as the tone plays
+    //         sound.rest().await;
+    //         Timer::after(Duration::from_millis(50)).await; // Give a short pause between notes
+    //     } else {
+    //         sound.rest().await;
+    //         Timer::after(Duration::from_millis(*ms + 50)).await; // Wait for the rest duration + a short pause
+    //     }
+    // }
+    // sound.rest().await;
+
+    // // run forever
+    // loop {
+    //     Timer::after(Duration::from_secs(3_153_600_000)).await; // 100 years
+    // }
 }
 
 pub struct Sound<'a>(&'a SoundNotifier);
@@ -63,7 +79,7 @@ impl Sound<'_> {
         notifier: &'static SoundNotifier,
         spawner: Spawner,
     ) -> Result<Self, SpawnError> {
-        spawner.spawn(device_loop(buzzer_pin, notifier))?;
+        spawner.spawn(device_loop_sound(buzzer_pin, notifier))?;
         Ok(Self(notifier))
     }
 
@@ -77,13 +93,16 @@ impl Sound<'_> {
 }
 
 #[embassy_executor::task]
-async fn device_loop(buzzer_pin: gpio::Output<'static>, notifier: &'static SoundNotifier) -> ! {
+async fn device_loop_sound(
+    buzzer_pin: gpio::Output<'static>,
+    notifier: &'static SoundNotifier,
+) -> ! {
     // should never return
-    let err = inner_device_loop(buzzer_pin, notifier).await;
+    let err = inner_device_loop_sound(buzzer_pin, notifier).await;
     panic!("{:?}", err);
 }
 
-async fn inner_device_loop(
+async fn inner_device_loop_sound(
     mut buzzer_pin: gpio::Output<'static>,
     notifier: &'static SoundNotifier,
 ) -> Result<Never> {
@@ -137,3 +156,81 @@ const TWINKLE_TWINKLE: [(u16, u64, &str); 16] = [
     (262, 800, "are"),  // C
     (0, 400, ""),       // rest
 ];
+
+pub struct Distance<'a>(&'a DistanceNotifier);
+pub type DistanceNotifier = Signal<CriticalSectionRawMutex, Option<f32>>;
+impl Distance<'_> {
+    #[must_use]
+    pub const fn notifier() -> DistanceNotifier {
+        Signal::new()
+    }
+
+    #[must_use = "Must be used to manage the spawned task"]
+    pub fn new(
+        trigger_pin: gpio::Output<'static>,
+        echo_pin: gpio::Input<'static>,
+        notifier: &'static DistanceNotifier,
+        spawner: Spawner,
+    ) -> Result<Self, SpawnError> {
+        spawner.spawn(device_loop_distance(trigger_pin, echo_pin, notifier))?;
+        Ok(Self(notifier))
+    }
+
+    pub async fn measure(&self) -> Option<f32> {
+        self.0.wait().await
+    }
+}
+
+#[embassy_executor::task]
+async fn device_loop_distance(
+    trigger_pin: gpio::Output<'static>,
+    echo_pin: gpio::Input<'static>,
+    notifier: &'static DistanceNotifier,
+) -> ! {
+    // should never return
+    let err = inner_device_loop_distance(trigger_pin, echo_pin, notifier).await;
+    panic!("{:?}", err);
+}
+
+const CM_MAX: f32 = 50.0;
+const CM_RESOLUTION: f32 = 0.1;
+const CM_PER_SECOND: f32 = 34300.0; // speed of sound in cm/s
+
+async fn inner_device_loop_distance(
+    mut trigger_pin: gpio::Output<'static>,
+    mut echo_pin: gpio::Input<'static>,
+    notifier: &'static DistanceNotifier,
+) -> Result<Never> {
+    // wait 2ms to settle
+    Timer::after(Duration::from_micros(2_000)).await;
+
+    const CM_PER_SECOND: f32 = 34300.0; // speed of sound in cm/s
+    let max_duration = Duration::from_micros((1_000_000.0 * CM_MAX * 2.0 / CM_PER_SECOND) as u64);
+    let mut previous_measure: Option<f32> = None;
+    loop {
+        trigger_pin.set_high();
+        Timer::after(Duration::from_micros(10)).await;
+        trigger_pin.set_low();
+        echo_pin.wait_for_high().await;
+        let start = Instant::now();
+        let measure = match select(Timer::after(max_duration), echo_pin.wait_for_low()).await {
+            Either::First(_) => None,
+            Either::Second(_) => {
+                let duration = Instant::now() - start;
+                Some(
+                    (duration.as_micros() as f32 * CM_PER_SECOND
+                        / 2.0
+                        / 1_000_000.0
+                        / CM_RESOLUTION) as u32 as f32
+                        * CM_RESOLUTION,
+                )
+            }
+        };
+        // round measure to CM_RESOLUTION
+        if previous_measure != measure {
+            notifier.signal(measure);
+            previous_measure = measure;
+        }
+        Timer::after(Duration::from_millis(60)).await;
+    }
+}
