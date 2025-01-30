@@ -1,8 +1,8 @@
 # Pico PIO Theremin
 
-This repository contains the code used in the articles
+This repository contains the code used in these in *Towards Data Science* articles:
 
-- [**Nine Pico PIO Wats with MicroPython**](https://towardsdatascience.com/nine-pico-pio-wats-with-micropython-part-1-82b80fb84473), [Part 1](https://towardsdatascience.com/nine-pico-pio-wats-with-micropython-part-1-82b80fb84473) & [Part 2](https://towardsdatascience.com/nine-pico-pio-wats-with-micropython-part-2-984a642f25a4), in *Towards Data Science*.
+- [**Nine Pico PIO Wats with MicroPython**](https://towardsdatascience.com/nine-pico-pio-wats-with-micropython-part-1-82b80fb84473), [Part 1](https://towardsdatascience.com/nine-pico-pio-wats-with-micropython-part-1-82b80fb84473) & [Part 2](https://towardsdatascience.com/nine-pico-pio-wats-with-micropython-part-2-984a642f25a4)
 
 - [**Nine Pico PIO Wats with Rust**](https://medium.com/towards-data-science/nine-pico-pio-wats-with-rust-part-1-9d062067dc25), [Part 1](https://medium.com/towards-data-science/nine-pico-pio-wats-with-rust-part-1-9d062067dc25) & Part 2 (*forthcoming*)
 
